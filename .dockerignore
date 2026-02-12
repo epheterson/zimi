@@ -1,0 +1,10 @@
+.git
+.github
+__pycache__
+*.md
+.gitignore
+.dockerignore
+.env
+zims/
+*.zim
+.DS_Store
