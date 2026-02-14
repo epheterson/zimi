@@ -9,3 +9,6 @@ zims/
 PLAN.md
 CLAUDE.md
 .playwright-mcp/
+build/
+dist/
+*.spec.bak

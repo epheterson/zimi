@@ -52,6 +52,7 @@ import traceback
 import xml.etree.ElementTree as ET
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, unquote, urlencode
+import urllib.error
 import urllib.request
 
 from libzim.reader import Archive
@@ -63,6 +64,8 @@ try:
     HAS_PYMUPDF = True
 except ImportError:
     HAS_PYMUPDF = False
+
+ZIMI_VERSION = "1.1.0"
 
 log = logging.getLogger("zimi")
 logging.basicConfig(format="%(asctime)s %(message)s", datefmt="%H:%M:%S", level=logging.INFO)
@@ -112,6 +115,166 @@ MAX_SEARCH_LIMIT = 50      # upper bound for search results per ZIM to prevent r
 MAX_CONTENT_BYTES = 10 * 1024 * 1024  # 10 MB — skip snippet extraction for entries larger than this
 MAX_SERVE_BYTES = 50 * 1024 * 1024    # 50 MB — refuse to serve entries larger than this (prevents OOM)
 MAX_POST_BODY = 4096                  # max bytes accepted in POST requests
+
+# ── Rate Limiting ──
+RATE_LIMIT = int(os.environ.get("ZIMI_RATE_LIMIT", "60"))  # requests per minute per IP (0 = disabled)
+_rate_buckets = {}  # {ip: [timestamps]}
+_rate_lock = threading.Lock()
+
+def _check_rate_limit(ip):
+    """Check if IP has exceeded rate limit. Returns seconds to wait, or 0 if OK."""
+    if RATE_LIMIT <= 0:
+        return 0
+    now = time.time()
+    window = 60.0  # 1 minute window
+    with _rate_lock:
+        timestamps = _rate_buckets.get(ip, [])
+        # Prune old entries
+        timestamps = [t for t in timestamps if now - t < window]
+        if len(timestamps) >= RATE_LIMIT:
+            retry_after = max(1, int(timestamps[0] + window - now) + 1)
+            _rate_buckets[ip] = timestamps
+            return retry_after
+        timestamps.append(now)
+        _rate_buckets[ip] = timestamps
+        # Periodic cleanup of stale IPs (every ~100 requests)
+        if len(_rate_buckets) > 1000:
+            stale = [k for k, v in _rate_buckets.items() if not v or now - v[-1] > window]
+            for k in stale:
+                del _rate_buckets[k]
+    return 0
+
+# ── Metrics ──
+_metrics = {
+    "start_time": time.time(),
+    "requests": {},       # {endpoint: count}
+    "latency_sum": {},    # {endpoint: total_seconds}
+    "errors": 0,
+    "rate_limited": 0,
+}
+_metrics_lock = threading.Lock()
+
+def _record_metric(endpoint, latency, error=False):
+    """Record a request metric."""
+    with _metrics_lock:
+        _metrics["requests"][endpoint] = _metrics["requests"].get(endpoint, 0) + 1
+        _metrics["latency_sum"][endpoint] = _metrics["latency_sum"].get(endpoint, 0) + latency
+        if error:
+            _metrics["errors"] += 1
+
+def _get_metrics():
+    """Get current metrics snapshot."""
+    with _metrics_lock:
+        uptime = time.time() - _metrics["start_time"]
+        total_reqs = sum(_metrics["requests"].values())
+        endpoints = {}
+        for ep, count in _metrics["requests"].items():
+            avg_latency = _metrics["latency_sum"].get(ep, 0) / count if count > 0 else 0
+            endpoints[ep] = {"count": count, "avg_latency_ms": round(avg_latency * 1000, 1)}
+        return {
+            "uptime_seconds": round(uptime),
+            "total_requests": total_reqs,
+            "errors": _metrics["errors"],
+            "rate_limited": _metrics["rate_limited"],
+            "endpoints": endpoints,
+        }
+
+def _get_disk_usage():
+    """Get disk usage info for ZIM directory. Works on all platforms."""
+    try:
+        import shutil
+        usage = shutil.disk_usage(ZIM_DIR)
+        total = usage.total
+        free = usage.free
+        used = usage.used
+        zim_size = sum(os.path.getsize(os.path.join(ZIM_DIR, f))
+                       for f in os.listdir(ZIM_DIR) if f.endswith(".zim"))
+        return {
+            "disk_total_gb": round(total / (1024**3), 1),
+            "disk_free_gb": round(free / (1024**3), 1),
+            "disk_used_gb": round(used / (1024**3), 1),
+            "disk_pct": round(used / total * 100, 1) if total > 0 else 0,
+            "zim_size_gb": round(zim_size / (1024**3), 1),
+        }
+    except (OSError, AttributeError):
+        return {}
+
+# ── Auto-Update ──
+_auto_update_enabled = os.environ.get("ZIMI_AUTO_UPDATE", "0") == "1"
+_auto_update_freq = os.environ.get("ZIMI_UPDATE_FREQ", "weekly")  # daily, weekly, monthly
+_auto_update_last_check = None
+_auto_update_thread = None
+
+_FREQ_SECONDS = {"daily": 86400, "weekly": 604800, "monthly": 2592000}
+
+def _auto_update_loop(initial_delay=0):
+    """Background thread that checks for and applies ZIM updates."""
+    global _auto_update_last_check
+    if initial_delay > 0:
+        log.info("Auto-update: first check in %ds", initial_delay)
+        for _ in range(initial_delay):
+            if not _auto_update_enabled:
+                return
+            time.sleep(1)
+    log.info("Auto-update enabled: checking every %s", _auto_update_freq)
+    while _auto_update_enabled:
+        try:
+            _auto_update_last_check = time.time()
+            updates = _check_updates()
+            if updates:
+                log.info("Auto-update: %d updates available", len(updates))
+                for upd in updates:
+                    url = upd.get("download_url")
+                    if not url:
+                        continue
+                    # Skip if already downloading this file
+                    filename = url.rsplit("/", 1)[-1] if "/" in url else url
+                    with _download_lock:
+                        already = any(d["filename"] == filename and not d.get("done")
+                                      for d in _active_downloads.values())
+                    if already:
+                        log.info("Auto-update: skipping %s (already downloading)", filename)
+                        continue
+                    dl_id, err = _start_download(url)
+                    if err:
+                        log.warning("Auto-update download failed for %s: %s", upd.get("name", "?"), err)
+                    else:
+                        log.info("Auto-update started download: %s (id=%s)", upd.get("name", "?"), dl_id)
+            else:
+                log.info("Auto-update: all ZIMs up to date")
+        except Exception as e:
+            log.warning("Auto-update check failed: %s", e)
+        # Sleep in 60s chunks so we can exit cleanly; re-read frequency each cycle
+        interval = _FREQ_SECONDS.get(_auto_update_freq, 604800)
+        for _ in range(max(interval // 60, 1)):
+            if not _auto_update_enabled:
+                break
+            time.sleep(60)
+
+# ── Search Cache ──
+_search_cache = {}       # {(query, zim, limit): (result, timestamp)}
+_search_cache_lock = threading.Lock()
+SEARCH_CACHE_MAX = 100
+SEARCH_CACHE_TTL = 300   # 5 minutes
+
+def _search_cache_get(key):
+    """Get cached search result if still valid."""
+    with _search_cache_lock:
+        entry = _search_cache.get(key)
+        if entry and time.time() - entry[1] < SEARCH_CACHE_TTL:
+            return entry[0]
+        if entry:
+            del _search_cache[key]
+    return None
+
+def _search_cache_put(key, result):
+    """Store search result in cache, evicting oldest if full."""
+    with _search_cache_lock:
+        if len(_search_cache) >= SEARCH_CACHE_MAX:
+            # Evict oldest entry
+            oldest_key = min(_search_cache, key=lambda k: _search_cache[k][1])
+            del _search_cache[oldest_key]
+        _search_cache[key] = (result, time.time())
 
 # MIME type fallback for ZIM entries with empty mimetype
 MIME_FALLBACK = {
@@ -349,7 +512,7 @@ def search_all(query_str, limit=5, filter_zim=None):
     ZIMs) and skips huge ZIMs when time budget is low to keep response times fast.
     """
     zims = get_zim_files()
-    cache_meta = {z["name"]: z.get("entries", 0) for z in (_zim_list_cache or [])}
+    cache_meta = {z["name"]: (z.get("entries") if isinstance(z.get("entries"), int) else 0) for z in (_zim_list_cache or [])}
     scoped = bool(filter_zim)
 
     if filter_zim:
@@ -450,11 +613,11 @@ def read_article(zim_name, article_path, max_length=MAX_CONTENT_LENGTH):
         item = entry.get_item()
         raw = bytes(item.content)
 
+        title = entry.title
         if item.mimetype == "application/pdf":
             # Extract text from embedded PDF
             plain = extract_pdf_text(raw, max_length=max_length)
             # Try to find a better title from the catalog
-            title = entry.title
             catalog = parse_catalog(archive)
             if catalog:
                 for doc in catalog:
@@ -470,7 +633,7 @@ def read_article(zim_name, article_path, max_length=MAX_CONTENT_LENGTH):
         return {
             "zim": zim_name,
             "path": article_path,
-            "title": entry.title if item.mimetype != "application/pdf" else title,
+            "title": title,
             "content": plain[:max_length],
             "truncated": truncated,
             "full_length": len(plain),
@@ -1034,28 +1197,75 @@ def _check_updates():
 
 
 def _download_thread(dl):
-    """Background thread that downloads a file via urllib."""
+    """Background thread that downloads a file via urllib.
+
+    Downloads to a .zim.tmp file first, then atomically renames on completion.
+    Supports resuming partial downloads via HTTP Range header.
+    """
+    tmp_dest = dl["dest"] + ".tmp"
     try:
+        # Resume from existing partial download if present
+        existing_size = 0
+        if os.path.exists(tmp_dest):
+            existing_size = os.path.getsize(tmp_dest)
         req = urllib.request.Request(dl["url"], headers={"User-Agent": "Zimi/1.0"})
-        with urllib.request.urlopen(req, timeout=600) as resp:
+        if existing_size > 0:
+            req.add_header("Range", f"bytes={existing_size}-")
+            log.info("Resuming download of %s from %d bytes", dl["filename"], existing_size)
+        try:
+            resp = urllib.request.urlopen(req, timeout=600)
+        except urllib.error.HTTPError as e:
+            if e.code == 416 and existing_size > 0:
+                # Range not satisfiable — file already complete, just rename
+                os.replace(tmp_dest, dl["dest"])
+                dl["done"] = True
+                return
+            raise
+        if resp.status == 206:
+            # Partial content — server supports resume
+            content_range = resp.headers.get("Content-Range", "")
+            # Content-Range: bytes 1234-5678/9999
+            try:
+                if "/" in content_range:
+                    total = int(content_range.split("/")[1])
+                else:
+                    total = existing_size + int(resp.headers.get("Content-Length", 0))
+            except (ValueError, IndexError):
+                total = existing_size + int(resp.headers.get("Content-Length", 0))
+            dl["total_bytes"] = total
+            dl["downloaded_bytes"] = existing_size
+            mode = "ab"  # append
+        else:
             total = int(resp.headers.get("Content-Length", 0))
             dl["total_bytes"] = total
-            with open(dl["dest"], "wb") as f:
-                while not dl.get("cancelled"):
-                    chunk = resp.read(65536)
-                    if not chunk:
-                        break
-                    f.write(chunk)
-                    dl["downloaded_bytes"] = dl.get("downloaded_bytes", 0) + len(chunk)
+            existing_size = 0  # server didn't support range, start over
+            mode = "wb"
+        with open(tmp_dest, mode) as f:
+            while not dl.get("cancelled"):
+                chunk = resp.read(65536)
+                if not chunk:
+                    break
+                f.write(chunk)
+                dl["downloaded_bytes"] = dl.get("downloaded_bytes", 0) + len(chunk)
+        resp.close()
         if dl.get("cancelled"):
-            # Clean up partial file
             try:
-                os.remove(dl["dest"])
+                os.remove(tmp_dest)
             except OSError:
                 pass
             dl["done"] = True
             dl["error"] = "Cancelled"
             return
+        # Verify download completed (size matches if known)
+        if total > 0:
+            actual = os.path.getsize(tmp_dest)
+            if actual != total:
+                os.remove(tmp_dest)
+                dl["done"] = True
+                dl["error"] = f"Size mismatch: expected {total}, got {actual}"
+                return
+        # Atomic rename: tmp → final
+        os.replace(tmp_dest, dl["dest"])
         log.info(f"Download complete: {dl['filename']}, refreshing library")
         # Remove older versions of the same ZIM
         base = re.match(r'^(.+?)_\d{4}-\d{2}\.zim$', dl["filename"])
@@ -1070,8 +1280,15 @@ def _download_thread(dl):
                         pass
         with _zim_lock:
             load_cache(force=True)
-        dl["done"] = True  # Mark done AFTER cache refresh so /list is current when client polls
+        dl["done"] = True
     except Exception as e:
+        # Keep .tmp for resume on transient network errors; delete on validation failures
+        is_transient = isinstance(e, (urllib.error.URLError, TimeoutError, ConnectionError, OSError))
+        if not is_transient:
+            try:
+                os.remove(tmp_dest)
+            except OSError:
+                pass
         dl["done"] = True
         dl["error"] = str(e)
 
@@ -1165,12 +1382,35 @@ class ZimHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/html")
         self.end_headers()
 
+    def _client_ip(self):
+        """Get client IP, respecting X-Forwarded-For for reverse proxies."""
+        xff = self.headers.get("X-Forwarded-For")
+        if xff:
+            return xff.split(",")[0].strip()
+        return self.client_address[0]
+
     def do_GET(self):
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
 
         def param(key, default=None):
             return params.get(key, [default])[0]
+
+        # Rate limit API endpoints (not UI, static, or manage)
+        rate_limited_paths = ("/search", "/read", "/suggest", "/snippet", "/random")
+        if parsed.path in rate_limited_paths:
+            retry_after = _check_rate_limit(self._client_ip())
+            if retry_after > 0:
+                with _metrics_lock:
+                    _metrics["rate_limited"] += 1
+                self.send_response(429)
+                self.send_header("Retry-After", str(retry_after))
+                self.send_header("Content-Type", "application/json")
+                msg = json.dumps({"error": "rate limited", "retry_after": retry_after}).encode()
+                self.send_header("Content-Length", str(len(msg)))
+                self.end_headers()
+                self.wfile.write(msg)
+                return
 
         try:
             if parsed.path == "/search":
@@ -1182,10 +1422,18 @@ class ZimHandler(BaseHTTPRequestHandler):
                 except (ValueError, TypeError):
                     limit = 5
                 zim = param("zim")
+                cache_key = (q.lower().strip(), zim or "", limit)
+                cached = _search_cache_get(cache_key)
+                if cached is not None:
+                    _record_metric("/search", 0)
+                    return self._json(200, cached)
                 t0 = time.time()
                 with _zim_lock:
                     result = search_all(q, limit=limit, filter_zim=zim)
-                log.info("search q=%r limit=%d zim=%s %.1fs", q, limit, zim or "all", time.time() - t0)
+                dt = time.time() - t0
+                _search_cache_put(cache_key, result)
+                _record_metric("/search", dt)
+                log.info("search q=%r limit=%d zim=%s %.1fs", q, limit, zim or "all", dt)
                 return self._json(200, result)
 
             elif parsed.path == "/read":
@@ -1197,8 +1445,10 @@ class ZimHandler(BaseHTTPRequestHandler):
                     max_len = min(int(param("max_length", str(MAX_CONTENT_LENGTH))), READ_MAX_LENGTH)
                 except ValueError:
                     max_len = MAX_CONTENT_LENGTH
+                t0 = time.time()
                 with _zim_lock:
                     result = read_article(zim, path, max_length=max_len)
+                _record_metric("/read", time.time() - t0)
                 return self._json(200, result)
 
             elif parsed.path == "/suggest":
@@ -1210,8 +1460,10 @@ class ZimHandler(BaseHTTPRequestHandler):
                 except (ValueError, TypeError):
                     limit = 10
                 zim = param("zim")
+                t0 = time.time()
                 with _zim_lock:
                     result = suggest(q, zim_name=zim, limit=limit)
+                _record_metric("/suggest", time.time() - t0)
                 return self._json(200, result)
 
             elif parsed.path == "/list":
@@ -1231,6 +1483,7 @@ class ZimHandler(BaseHTTPRequestHandler):
                 path = param("path")
                 if not zim or not path:
                     return self._json(400, {"error": "missing ?zim= and ?path= parameters"})
+                t0 = time.time()
                 with _zim_lock:
                     archive = get_archive(zim)
                     if archive is None:
@@ -1247,11 +1500,12 @@ class ZimHandler(BaseHTTPRequestHandler):
                         snippet = plain[:300].strip()
                     except (KeyError, Exception):
                         snippet = ""
+                _record_metric("/snippet", time.time() - t0)
                 return self._json(200, {"snippet": snippet})
 
             elif parsed.path == "/health":
                 zim_count = len(get_zim_files())
-                return self._json(200, {"status": "ok", "zim_count": zim_count, "pdf_support": HAS_PYMUPDF})
+                return self._json(200, {"status": "ok", "version": ZIMI_VERSION, "zim_count": zim_count, "pdf_support": HAS_PYMUPDF})
 
             elif parsed.path == "/random":
                 zim = param("zim")  # optional: scope to specific ZIM
@@ -1272,8 +1526,10 @@ class ZimHandler(BaseHTTPRequestHandler):
                     result = random_entry(archive)
                 if not result:
                     return self._json(200, {"error": "no articles found"})
+                dt = time.time() - t0
                 chosen = {"zim": pick_name, "path": result["path"], "title": result["title"]}
-                log.info("random zim=%s title=%r %.1fs", pick_name, result["title"], time.time() - t0)
+                _record_metric("/random", dt)
+                log.info("random zim=%s title=%r %.1fs", pick_name, result["title"], dt)
                 return self._json(200, chosen)
 
             elif parsed.path.startswith("/manage/"):
@@ -1293,6 +1549,16 @@ class ZimHandler(BaseHTTPRequestHandler):
                         "total_size_gb": round(total_gb, 1),
                         "manage_enabled": True,
                     })
+
+                elif parsed.path == "/manage/stats":
+                    metrics = _get_metrics()
+                    disk = _get_disk_usage()
+                    auto_update = {
+                        "enabled": _auto_update_enabled,
+                        "frequency": _auto_update_freq,
+                        "last_check": _auto_update_last_check,
+                    }
+                    return self._json(200, {"metrics": metrics, "disk": disk, "auto_update": auto_update})
 
                 elif parsed.path == "/manage/catalog":
                     query = param("q", "")
@@ -1332,9 +1598,13 @@ class ZimHandler(BaseHTTPRequestHandler):
                 else:
                     zim_name = unquote(rest[:slash])
                     entry_path = unquote(rest[slash + 1:])
-                # Empty path → serve SPA (source mode handled client-side)
+                # Empty path → redirect to SPA with hash route (avoids iframe nesting)
                 if not entry_path:
-                    return self._html(200, SEARCH_UI_HTML)
+                    self.send_response(302)
+                    self.send_header("Location", f"/#/source/{zim_name}")
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
                 return self._serve_zim_content(zim_name, entry_path)
 
             else:
@@ -1426,16 +1696,34 @@ class ZimHandler(BaseHTTPRequestHandler):
                     return self._json(500, {"error": f"Failed to delete: {e}"})
 
             elif parsed.path == "/manage/update" and ZIMI_MANAGE:
-                # Trigger the kiwix-zim.sh updater (fire-and-forget)
-                updater = os.path.join(ZIM_DIR, "kiwix-zim", "kiwix-zim.sh")
-                if not os.path.exists(updater):
-                    return self._json(404, {"error": f"Updater not found at {updater}"})
-                subprocess.Popen(
-                    ["nohup", updater, "-d", ZIM_DIR],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                    start_new_session=True,
-                )
-                return self._json(200, {"status": "started"})
+                # Trigger manual update: check for updates and start downloads
+                updates = _check_updates()
+                started = []
+                for upd in updates:
+                    url = upd.get("download_url")
+                    if url:
+                        dl_id, err = _start_download(url)
+                        if not err:
+                            started.append({"name": upd.get("name", "?"), "id": dl_id})
+                return self._json(200, {"status": "started", "count": len(started), "downloads": started})
+
+            elif parsed.path == "/manage/auto-update" and ZIMI_MANAGE:
+                global _auto_update_enabled, _auto_update_freq, _auto_update_thread
+                enabled = data.get("enabled", _auto_update_enabled)
+                freq = data.get("frequency", _auto_update_freq)
+                if freq not in _FREQ_SECONDS:
+                    return self._json(400, {"error": f"Invalid frequency. Use: {', '.join(_FREQ_SECONDS.keys())}"})
+                _auto_update_freq = freq
+                if enabled and not _auto_update_enabled:
+                    _auto_update_enabled = True
+                    _auto_update_thread = threading.Thread(
+                        target=_auto_update_loop, kwargs={"initial_delay": 30}, daemon=True)
+                    _auto_update_thread.start()
+                    log.info("Auto-update enabled: %s (first check in 30s)", freq)
+                elif not enabled and _auto_update_enabled:
+                    _auto_update_enabled = False
+                    log.info("Auto-update disabled")
+                return self._json(200, {"enabled": _auto_update_enabled, "frequency": _auto_update_freq})
 
             else:
                 return self._json(404, {"error": "not found"})
@@ -1667,6 +1955,17 @@ def main():
         print(f"ZIM Reader API starting on port {args.port}")
         print(f"ZIM directory: {ZIM_DIR}")
         load_cache()
+        # Clean up stale partial downloads (>24h old)
+        for tmp in glob.glob(os.path.join(ZIM_DIR, "*.zim.tmp")):
+            try:
+                age = time.time() - os.path.getmtime(tmp)
+                if age > 86400:
+                    os.remove(tmp)
+                    log.info("Cleaned up stale partial download: %s", os.path.basename(tmp))
+                else:
+                    log.info("Partial download found (resumable): %s", os.path.basename(tmp))
+            except OSError:
+                pass
         # Pre-warm all archive handles so first search is fast
         zims = get_zim_files()
         log.info("Pre-warming %d archives...", len(zims))
@@ -1676,6 +1975,10 @@ def main():
             except Exception as e:
                 log.warning("Skipping %s: %s", name, e)
         log.info("All archives ready")
+        # Start auto-update thread if enabled
+        if _auto_update_enabled:
+            _auto_update_thread = threading.Thread(target=_auto_update_loop, daemon=True)
+            _auto_update_thread.start()
         print(f"Endpoints: /search, /read, /suggest, /list, /health")
         server = ThreadingHTTPServer(("0.0.0.0", args.port), ZimHandler)
         server.serve_forever()
