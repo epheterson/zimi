@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Zimi</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23f59e0b'/><text x='16' y='24' text-anchor='middle' font-family='system-ui' font-size='22' font-weight='700' fill='%230a0a0b'>Z</text></svg>">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -395,6 +396,32 @@
     border-radius: 12px; transition: all 0.2s; white-space: nowrap;
   }
   .ci-variant-btn:hover { border-color: var(--amber-border); background: var(--amber-glow); color: var(--text); }
+  /* Flavor picker pill + popup */
+  .flavor-pill {
+    display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500;
+    color: var(--text2); background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 2px 8px 2px 8px; cursor: pointer; transition: all 0.2s;
+    white-space: nowrap; position: relative;
+  }
+  .flavor-pill:hover { border-color: var(--amber-border); color: var(--text); background: var(--amber-glow); }
+  .flavor-pill svg { opacity: 0.5; flex-shrink: 0; }
+  .flavor-pill:hover svg { opacity: 0.8; }
+  .flavor-popup {
+    position: fixed; z-index: 1000; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: 0 8px 32px rgba(0,0,0,0.5); padding: 12px;
+    min-width: 220px; max-width: 300px;
+  }
+  .flavor-popup-title { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+  .flavor-option {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 6px;
+    cursor: pointer; transition: all 0.15s; border: 1px solid transparent; margin-bottom: 2px;
+  }
+  .flavor-option:hover { background: var(--surface2); border-color: var(--border); }
+  .flavor-option.current { background: var(--amber-glow); border-color: var(--amber-border); cursor: default; }
+  .flavor-option-label { flex: 1; font-size: 12px; font-weight: 500; color: var(--text); }
+  .flavor-option-size { font-size: 11px; color: var(--text2); white-space: nowrap; }
+  .flavor-option-check { width: 16px; color: var(--amber); font-weight: bold; text-align: center; flex-shrink: 0; }
+  .flavor-popup-backdrop { position: fixed; inset: 0; z-index: 999; }
   .ci-section-label {
     font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
     color: var(--text2); padding: 16px 0 8px; opacity: 0.7;
@@ -590,7 +617,7 @@
     <div id="output"></div>
   </div>
   <footer id="footer" class="footer" style="display:none">
-    <a href="https://github.com/epheterson/zimi" target="_blank" rel="noopener" class="footer-brand">Zimi</a> &middot; Powered by <a href="https://kiwix.org" target="_blank" rel="noopener">Kiwix</a>
+    <a href="https://github.com/epheterson/zimi" target="_blank" rel="noopener" class="footer-brand">Zimi</a> <span id="footer-version"></span>&middot; Powered by <a href="https://kiwix.org" target="_blank" rel="noopener">Kiwix</a>
     <div class="footer-sub"><span class="kbd-hints"><kbd>/</kbd> Search &middot; <kbd>R</kbd> Random &middot; <kbd>Esc</kbd> Back</span></div>
   </footer>
 </main>
@@ -720,14 +747,16 @@ function updateTopbar() {
     bcIcon.style.display = 'inline-flex';
     const info = zimsCache && zimsCache.find(z => z.name === activeSource);
     const title = _zimTitle(activeSource);
+    bcIcon.title = title;
     if (info && info.has_icon) {
-      bcIcon.innerHTML = '<img src="/w/' + encodeURIComponent(activeSource) + '/-/icon" width="22" height="22">';
+      bcIcon.innerHTML = '<img src="/w/' + encodeURIComponent(activeSource) + '/-/icon" width="22" height="22" alt="' + escAttr(title) + '">';
     } else {
       bcIcon.innerHTML = '<span class="bc-letter">' + (esc(title)[0] || 'Z').toUpperCase() + '</span>';
     }
   } else {
     bcSep.style.display = 'none';
     bcIcon.style.display = 'none';
+    bcIcon.title = '';
   }
 
   // Manage: gear → X close button, keep breadcrumb as-is
@@ -803,17 +832,54 @@ async function init() {
       manageEnabled = true;  // manage exists but needs password
     }
   } catch(e) {}
+  // Fetch version for footer
+  try {
+    const hres = await fetch('/health');
+    if (hres.ok) {
+      const hdata = await hres.json();
+      if (hdata.version) document.getElementById('footer-version').textContent = hdata.version + ' ';
+    }
+  } catch(e) {}
   route(false);
 }
 
 function route(push) {
   const path = location.pathname;
   const search = location.search;
-  if (search === '?manage' && manageEnabled) { enterManage(); return; }
+  const params = new URLSearchParams(search);
+  if (params.get('manage') !== null && manageEnabled) { enterManage(); return; }
   if (path.startsWith('/w/')) {
-    const rest = decodeURIComponent(path.slice(3));
-    const name = rest.split('/')[0];
-    if (name) { enterSource(name, push); return; }
+    let rest;
+    try { rest = decodeURIComponent(path.slice(3)); } catch(e) { rest = path.slice(3); }
+    const slashIdx = rest.indexOf('/');
+    const name = slashIdx === -1 ? rest : rest.slice(0, slashIdx);
+    const articlePath = slashIdx === -1 ? null : rest.slice(slashIdx + 1);
+    if (name) {
+      // If URL has a query, restore the search
+      const qParam = params.get('q');
+      if (qParam) {
+        enterSource(name, false);
+        q.value = qParam;
+        doSearch(qParam);
+        return;
+      }
+      // If URL has an article path, open the article directly
+      if (articlePath) {
+        enterSource(name, false);
+        openArticle(name, articlePath);
+        return;
+      }
+      enterSource(name, push);
+      return;
+    }
+  }
+  // Global search: /?q=term
+  const qParam = params.get('q');
+  if (qParam) {
+    enterHome(false);
+    q.value = qParam;
+    doSearch(qParam);
+    return;
   }
   if (zimsCache && zimsCache.length === 1) {
     enterSource(zimsCache[0].name, false);
@@ -891,7 +957,9 @@ function renderHome(filter) {
   if (!zimsCache || zimsCache.length === 0) {
     statsBar.innerHTML = ''; statsBar.style.display = 'none';
     pillsBar.innerHTML = ''; pillsBar.style.display = 'none';
-    output.innerHTML = '<div class="empty"><p>No knowledge sources found</p><p class="hint">Add ZIM files to get started</p></div>';
+    output.innerHTML = '<div class="empty"><p>No knowledge sources found</p><p class="hint">Add ZIM files to get started</p>'
+      + (manageEnabled ? '<a href="/?manage" onclick="event.preventDefault();enterManage();setTimeout(function(){switchManageTab(\'browse\')},50)" style="display:inline-block;margin-top:16px;color:var(--amber);font-weight:500;font-size:14px;text-decoration:none;border-bottom:1px solid var(--amber-border)">Browse Library \u2192</a>' : '')
+      + '</div>';
     return;
   }
 
@@ -1669,9 +1737,8 @@ function renderBrowseGallery() {
 
     const visibleCats = BROWSE_CATEGORIES.filter(c => (catCounts[c.key] || 0) > 0);
     let h = '<div class="browse-gallery">';
-    h += '<div class="browse-header"><div class="browse-title">Browse Library</div>';
-    h += '<div class="browse-subtitle">' + items.length.toLocaleString() + ' ZIMs available across ' +
-      visibleCats.length + ' categories</div></div>';
+    h += '<div class="browse-subtitle" style="text-align:center;margin:12px 0 8px">' + items.length.toLocaleString() + ' ZIMs available across ' +
+      visibleCats.length + ' categories</div>';
     h += '<div class="browse-grid">';
 
     for (const cat of BROWSE_CATEGORIES) {
@@ -1729,7 +1796,7 @@ function drillCategory(catKey) {
     });
 
     let h = '<div class="browse-drilldown-header">' +
-      '<button class="browse-back" onclick="renderBrowseGallery()">\u2190 Back to library</button>' +
+      '<button class="browse-back" onclick="renderBrowseGallery()">\u2190 Browse Library</button>' +
       '<span class="browse-drilldown-title">' + (catMeta ? catMeta.icon + ' ' : '') + esc(catName) + '</span>' +
       '<span class="browse-drilldown-count">' + grouped.length + ' available</span>' +
     '</div>';
@@ -1963,13 +2030,22 @@ async function renderManage() {
         '<div class="mc-row"><span class="mc-label">ZIM files</span><span class="mc-value">' + esc(String(data.zim_count)) + '</span></div>' +
         '<div class="mc-row"><span class="mc-label">Total size</span><span class="mc-value">' + fmtSize(data.total_size_gb) + '</span></div>' +
         '<div id="update-status" class="mc-row"><span class="mc-label">Updates</span><span class="mc-value" style="color:var(--text2)">Checking\u2026</span></div>' +
+        '<div class="mc-row" style="align-items:center">' +
+          '<span class="mc-label">Auto-update</span>' +
+          '<span class="mc-value">' +
+            '<select id="auto-update-freq" onchange="toggleAutoUpdate()" style="font-size:12px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface2);color:var(--text)">' +
+              '<option value="disabled">Disabled</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option>' +
+            '</select>' +
+          '</span>' +
+        '</div>' +
         '<div style="margin-top:12px;display:flex;gap:8px;align-items:center">' +
           '<button class="manage-btn-action" onclick="refreshLibrary()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">Refresh Cache</button>' +
           '<button id="pw-btn" class="manage-btn-action" onclick="managePassword()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">&#x1F512; Password</button>' +
           (sessionStorage.getItem('zimi_manage_pw') ? '<button class="manage-btn-action" onclick="manageLogout()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)" title="Log out and return to home">Log Out</button>' : '') +
           '<span style="flex:1"></span>' +
           '<button id="update-all-btn" class="manage-btn-action" onclick="triggerUpdate()" style="display:none">Update All</button>' +
-        '</div>';
+        '</div>' +
+        '';
     }
     checkForUpdates();
   } catch(e) {
@@ -1989,6 +2065,58 @@ async function renderManage() {
     }
   }
   refreshDownloads();
+  // Pre-fetch catalog in background so flavor pills can populate on installed tab
+  if (!_catalogCache) {
+    loadFullCatalog().then(() => { if (manageTab === 'installed') renderInstalled(); }).catch(() => {});
+  }
+}
+
+async function loadManageStats() {
+  try {
+    const res = await manageFetch('/manage/stats');
+    const data = await res.json();
+    const el = document.getElementById('manage-stats');
+    if (!el) return;
+    const m = data.metrics || {};
+    const d = data.disk || {};
+    const au = data.auto_update || {};
+    // Set auto-update dropdown state
+    const freqSel = document.getElementById('auto-update-freq');
+    if (freqSel) freqSel.value = au.enabled ? (au.frequency || 'weekly') : 'disabled';
+    // Build compact stats
+    const uptime = m.uptime_seconds || 0;
+    const uptimeStr = uptime < 3600 ? Math.round(uptime / 60) + 'm' :
+                      uptime < 86400 ? Math.round(uptime / 3600) + 'h' :
+                      Math.round(uptime / 86400) + 'd';
+    let h = '';
+    h += '<div class="mc-row"><span class="mc-label">Uptime</span><span class="mc-value">' + uptimeStr + '</span></div>';
+    h += '<div class="mc-row"><span class="mc-label">Requests</span><span class="mc-value">' + (m.total_requests || 0) + '</span></div>';
+    if (m.endpoints) {
+      const eps = Object.entries(m.endpoints).sort((a,b) => b[1].count - a[1].count).slice(0, 5);
+      for (const [ep, info] of eps) {
+        h += '<div class="mc-row" style="padding-left:16px"><span class="mc-label" style="font-size:12px">' + esc(ep) + '</span><span class="mc-value" style="font-size:12px">' + info.count + ' (' + info.avg_latency_ms + 'ms avg)</span></div>';
+      }
+    }
+    if (m.rate_limited) h += '<div class="mc-row"><span class="mc-label">Rate limited</span><span class="mc-value" style="color:var(--amber)">' + m.rate_limited + '</span></div>';
+    if (d.zim_size_gb) {
+      h += '<div class="mc-row"><span class="mc-label">ZIM files</span><span class="mc-value">' + d.zim_size_gb + ' GB</span></div>';
+    }
+    el.innerHTML = h;
+  } catch(e) { /* stats are optional */ }
+}
+
+async function toggleAutoUpdate() {
+  const freqSel = document.getElementById('auto-update-freq');
+  if (!freqSel) return;
+  const val = freqSel.value;
+  const enabled = val !== 'disabled';
+  try {
+    await manageFetch('/manage/auto-update', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({enabled: enabled, frequency: enabled ? val : 'weekly'})
+    });
+  } catch(e) { /* ignore */ }
 }
 
 function getInstalledPillsHtml() {
@@ -2062,6 +2190,20 @@ function renderInstalled(filterText) {
       // Show date from ZIM metadata
       const dateStr = z.date ? z.date.substring(0, 7) : null;
       if (dateStr) meta.push(dateStr);
+      // Flavor badge from filename
+      const flavor = variantLabel(z.file);
+      const variants = getFlavorVariants(z);
+      // Show flavor as clickable pill if alternatives exist, otherwise just text
+      if (variants.length > 1) {
+        const vid = '_fv_' + z.name;
+        window[vid] = variants;
+        meta.push('<span class="flavor-pill" onclick="showFlavorPicker(this, \'' + escAttr(z.name) + '\', window[\'' + vid + '\'])">' +
+          esc(flavor || 'Full') +
+          '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>' +
+        '</span>');
+      } else if (flavor) {
+        meta.push('<span style="color:var(--text2);font-weight:500">' + esc(flavor) + '</span>');
+      }
       const upd = _availableUpdates[z.file];
       let actionsHtml = '';
       if (upd) {
@@ -2085,6 +2227,82 @@ function renderInstalled(filterText) {
   }
   if (!items_h) items_h = '<div class="empty"><p>No matching ZIMs</p></div>';
   el.innerHTML = getInstalledPillsHtml() + items_h;
+}
+
+function getFlavorVariants(installedZim) {
+  // Find catalog variants that match this installed ZIM's base name
+  if (!_catalogCache) return [];
+  // Installed file: "wikipedia_en_all_maxi_2024-05.zim" → base: "wikipedia_en_all"
+  const fb = (installedZim.file || '').replace(/\.zim$/, '');
+  const matching = _catalogCache.filter(item => {
+    return fb.startsWith(item.name + '_') || fb === item.name;
+  });
+  if (matching.length <= 1) return [];
+  // Build variant list with labels and sizes
+  const currentFlavor = variantLabel(installedZim.file) || 'Full';
+  return matching.map(item => ({
+    label: variantLabel(item.download_url) || 'Full',
+    size: formatSize(item.size_bytes),
+    url: item.download_url,
+    current: (variantLabel(item.download_url) || 'Full') === currentFlavor,
+  })).sort((a, b) => {
+    const order = { 'Mini': 0, 'No images': 1, 'Full': 2 };
+    return (order[a.label] ?? 1) - (order[b.label] ?? 1);
+  });
+}
+
+function showFlavorPicker(btn, zimName, variants) {
+  // Remove any existing popup
+  closeFlavorPopup();
+  const rect = btn.getBoundingClientRect();
+  // Backdrop to close on click outside
+  const backdrop = document.createElement('div');
+  backdrop.className = 'flavor-popup-backdrop';
+  backdrop.onclick = closeFlavorPopup;
+  document.body.appendChild(backdrop);
+  // Popup
+  const popup = document.createElement('div');
+  popup.className = 'flavor-popup';
+  popup.id = 'flavor-popup';
+  let html = '<div class="flavor-popup-title">Choose flavor</div>';
+  for (const v of variants) {
+    if (v.current) {
+      html += '<div class="flavor-option current">' +
+        '<div class="flavor-option-check">\u2713</div>' +
+        '<div class="flavor-option-label">' + esc(v.label) + '</div>' +
+        '<div class="flavor-option-size">' + esc(v.size) + '</div>' +
+      '</div>';
+    } else {
+      html += '<div class="flavor-option" onclick="switchToFlavor(\'' + escAttr(v.url) + '\', \'' + escAttr(zimName) + '\')">' +
+        '<div class="flavor-option-check"></div>' +
+        '<div class="flavor-option-label">' + esc(v.label) + '</div>' +
+        '<div class="flavor-option-size">' + esc(v.size) + '</div>' +
+      '</div>';
+    }
+  }
+  popup.innerHTML = html;
+  document.body.appendChild(popup);
+  // Position below the pill, clamped to viewport
+  const popW = popup.offsetWidth;
+  let left = rect.right - popW;
+  if (left < 8) left = 8;
+  let top = rect.bottom + 6;
+  if (top + popup.offsetHeight > window.innerHeight - 8) top = rect.top - popup.offsetHeight - 6;
+  popup.style.left = left + 'px';
+  popup.style.top = top + 'px';
+}
+
+function closeFlavorPopup() {
+  const popup = document.getElementById('flavor-popup');
+  if (popup) popup.remove();
+  const bd = document.querySelector('.flavor-popup-backdrop');
+  if (bd) bd.remove();
+}
+
+function switchToFlavor(downloadUrl, zimName) {
+  closeFlavorPopup();
+  // Find a nearby download button or create a virtual one for progress tracking
+  downloadZim(downloadUrl, null);
 }
 
 // ── Browse tab: explicit server-side catalog search (Search button / Enter in catalog-q) ──
@@ -2113,7 +2331,7 @@ async function searchCatalog(append) {
     let h = '';
     if (!append) {
       h += '<div class="browse-drilldown-header">' +
-        '<button class="browse-back" onclick="renderBrowseGallery();q.value=\'\'">\u2190 Back to library</button>' +
+        '<button class="browse-back" onclick="renderBrowseGallery();q.value=\'\'">\u2190 Browse Library</button>' +
         '<span class="browse-drilldown-count">' + esc(String(data.total)) + ' results</span></div>';
     }
     for (const item of grouped) h += renderCatalogItem(item);
@@ -2326,6 +2544,7 @@ async function refreshDownloads() {
         zimsCache = await lr.json();
         _catalogCache = null;
         _availableUpdates = {};
+        await loadFullCatalog().catch(() => {});
         renderInstalled();
         checkForUpdates();
         // Update status card counts

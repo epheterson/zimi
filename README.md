@@ -21,7 +21,7 @@ Search and read 100M+ articles offline. API-first knowledge server for [ZIM file
 |----------------|-----------------|
 | ![Reader](screenshots/reader.png) | ![Library](screenshots/library.png) |
 
-## Quick Start
+## Quick Start (Docker)
 
 **Have ZIM files already?** Mount them and go:
 
@@ -55,7 +55,7 @@ curl "http://localhost:8899/search?q=water+purification&limit=3"
 | `GET /catalog?zim=...` | PDF catalog for zimgit-style ZIMs |
 | `GET /snippet?zim=...&path=...` | Short text snippet |
 | `GET /random?zim=...` | Random article |
-| `GET /health` | Health check |
+| `GET /health` | Health check (includes version) |
 | `GET /w/<zim>/<path>` | Serve raw ZIM content (HTML, images) |
 
 ### Examples
@@ -165,6 +165,9 @@ services:
 | `ZIM_DIR` | `/zims` | Path to directory containing ZIM files |
 | `ZIMI_MANAGE` | `1` | Library manager (browse/download ZIMs). Set to `0` to disable. |
 | `ZIMI_MANAGE_PASSWORD` | _(none)_ | Password to protect library management. Can also be set from the UI. |
+| `ZIMI_AUTO_UPDATE` | `0` | Auto-update ZIMs. Set to `1` to enable. |
+| `ZIMI_UPDATE_FREQ` | `weekly` | Auto-update frequency: `daily`, `weekly`, or `monthly`. |
+| `ZIMI_RATE_LIMIT` | `60` | API rate limit (requests/minute per IP). Set to `0` to disable. |
 
 **Forgot your password?** Delete `.zimi_password` from your ZIM directory and restart the container.
 
@@ -187,6 +190,8 @@ Management API endpoints:
 | `GET /manage/downloads` | Active download status |
 | `POST /manage/download` | Start a ZIM download |
 | `POST /manage/refresh` | Re-scan and rebuild cache |
+| `GET /manage/stats` | Server metrics (requests, latency, cache) |
+| `POST /manage/auto-update` | Configure auto-update (enable/disable, frequency) |
 
 ## Getting ZIM Files
 
