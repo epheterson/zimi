@@ -1587,7 +1587,7 @@ class ZimHandler(BaseHTTPRequestHandler):
                     return self._json(404, {"error": "not found"})
 
             elif parsed.path == "/":
-                return self._html(200, SEARCH_UI_HTML)
+                return self._serve_index()
 
             elif parsed.path.startswith("/w/"):
                 # /w/<zim_name>/<entry_path> — serve raw ZIM content
@@ -1598,13 +1598,12 @@ class ZimHandler(BaseHTTPRequestHandler):
                 else:
                     zim_name = unquote(rest[:slash])
                     entry_path = unquote(rest[slash + 1:])
-                # Empty path → redirect to SPA with hash route (avoids iframe nesting)
-                if not entry_path:
-                    self.send_response(302)
-                    self.send_header("Location", f"/#/source/{zim_name}")
-                    self.send_header("Content-Length", "0")
-                    self.end_headers()
-                    return
+                # Top-level browser navigation (reload/bookmark) → serve SPA shell
+                # so client-side router can handle the deep link.
+                # Iframe/fetch requests get raw ZIM content as before.
+                fetch_dest = self.headers.get("Sec-Fetch-Dest", "")
+                if fetch_dest == "document" or not entry_path:
+                    return self._serve_index()
                 return self._serve_zim_content(zim_name, entry_path)
 
             else:
@@ -1881,6 +1880,9 @@ class ZimHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body_bytes)))
         self.end_headers()
         self.wfile.write(body_bytes)
+
+    def _serve_index(self):
+        return self._html(200, SEARCH_UI_HTML)
 
     def _html(self, code, content):
         self._send(code, content.encode(), "text/html; charset=utf-8")

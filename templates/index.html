@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Zimi</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23f59e0b'/><text x='16' y='24' text-anchor='middle' font-family='system-ui' font-size='22' font-weight='700' fill='%230a0a0b'>Z</text></svg>">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -396,6 +396,32 @@
     border-radius: 12px; transition: all 0.2s; white-space: nowrap;
   }
   .ci-variant-btn:hover { border-color: var(--amber-border); background: var(--amber-glow); color: var(--text); }
+  /* Flavor picker pill + popup */
+  .flavor-pill {
+    display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500;
+    color: var(--text2); background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 2px 8px 2px 8px; cursor: pointer; transition: all 0.2s;
+    white-space: nowrap; position: relative;
+  }
+  .flavor-pill:hover { border-color: var(--amber-border); color: var(--text); background: var(--amber-glow); }
+  .flavor-pill svg { opacity: 0.5; flex-shrink: 0; }
+  .flavor-pill:hover svg { opacity: 0.8; }
+  .flavor-popup {
+    position: fixed; z-index: 1000; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: 0 8px 32px rgba(0,0,0,0.5); padding: 12px;
+    min-width: 220px; max-width: 300px;
+  }
+  .flavor-popup-title { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+  .flavor-option {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 6px;
+    cursor: pointer; transition: all 0.15s; border: 1px solid transparent; margin-bottom: 2px;
+  }
+  .flavor-option:hover { background: var(--surface2); border-color: var(--border); }
+  .flavor-option.current { background: var(--amber-glow); border-color: var(--amber-border); cursor: default; }
+  .flavor-option-label { flex: 1; font-size: 12px; font-weight: 500; color: var(--text); }
+  .flavor-option-size { font-size: 11px; color: var(--text2); white-space: nowrap; }
+  .flavor-option-check { width: 16px; color: var(--amber); font-weight: bold; text-align: center; flex-shrink: 0; }
+  .flavor-popup-backdrop { position: fixed; inset: 0; z-index: 999; }
   .ci-section-label {
     font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
     color: var(--text2); padding: 16px 0 8px; opacity: 0.7;
@@ -811,7 +837,7 @@ async function init() {
     const hres = await fetch('/health');
     if (hres.ok) {
       const hdata = await hres.json();
-      if (hdata.version) document.getElementById('footer-version').textContent = 'v' + hdata.version + ' ';
+      if (hdata.version) document.getElementById('footer-version').textContent = hdata.version + ' ';
     }
   } catch(e) {}
   route(false);
@@ -820,11 +846,39 @@ async function init() {
 function route(push) {
   const path = location.pathname;
   const search = location.search;
-  if (search === '?manage' && manageEnabled) { enterManage(); return; }
+  const params = new URLSearchParams(search);
+  if (params.get('manage') !== null && manageEnabled) { enterManage(); return; }
   if (path.startsWith('/w/')) {
     const rest = decodeURIComponent(path.slice(3));
-    const name = rest.split('/')[0];
-    if (name) { enterSource(name, push); return; }
+    const slashIdx = rest.indexOf('/');
+    const name = slashIdx === -1 ? rest : rest.slice(0, slashIdx);
+    const articlePath = slashIdx === -1 ? null : rest.slice(slashIdx + 1);
+    if (name) {
+      // If URL has a query, restore the search
+      const qParam = params.get('q');
+      if (qParam) {
+        enterSource(name, false);
+        q.value = qParam;
+        doSearch(qParam);
+        return;
+      }
+      // If URL has an article path, open the article directly
+      if (articlePath) {
+        enterSource(name, false);
+        openArticle(name, articlePath);
+        return;
+      }
+      enterSource(name, push);
+      return;
+    }
+  }
+  // Global search: /?q=term
+  const qParam = params.get('q');
+  if (qParam) {
+    enterHome(false);
+    q.value = qParam;
+    doSearch(qParam);
+    return;
   }
   if (zimsCache && zimsCache.length === 1) {
     enterSource(zimsCache[0].name, false);
@@ -902,7 +956,9 @@ function renderHome(filter) {
   if (!zimsCache || zimsCache.length === 0) {
     statsBar.innerHTML = ''; statsBar.style.display = 'none';
     pillsBar.innerHTML = ''; pillsBar.style.display = 'none';
-    output.innerHTML = '<div class="empty"><p>No knowledge sources found</p><p class="hint">Add ZIM files to get started</p></div>';
+    output.innerHTML = '<div class="empty"><p>No knowledge sources found</p><p class="hint">Add ZIM files to get started</p>'
+      + (manageEnabled ? '<a href="/?manage" onclick="event.preventDefault();enterManage();setTimeout(function(){switchManageTab(\'browse\')},50)" style="display:inline-block;margin-top:16px;color:var(--amber);font-weight:500;font-size:14px;text-decoration:none;border-bottom:1px solid var(--amber-border)">Browse Library \u2192</a>' : '')
+      + '</div>';
     return;
   }
 
@@ -1680,9 +1736,8 @@ function renderBrowseGallery() {
 
     const visibleCats = BROWSE_CATEGORIES.filter(c => (catCounts[c.key] || 0) > 0);
     let h = '<div class="browse-gallery">';
-    h += '<div class="browse-header"><div class="browse-title">Browse Library</div>';
-    h += '<div class="browse-subtitle">' + items.length.toLocaleString() + ' ZIMs available across ' +
-      visibleCats.length + ' categories</div></div>';
+    h += '<div class="browse-subtitle" style="text-align:center;margin:12px 0 8px">' + items.length.toLocaleString() + ' ZIMs available across ' +
+      visibleCats.length + ' categories</div>';
     h += '<div class="browse-grid">';
 
     for (const cat of BROWSE_CATEGORIES) {
@@ -1740,7 +1795,7 @@ function drillCategory(catKey) {
     });
 
     let h = '<div class="browse-drilldown-header">' +
-      '<button class="browse-back" onclick="renderBrowseGallery()">\u2190 Back to library</button>' +
+      '<button class="browse-back" onclick="renderBrowseGallery()">\u2190 Browse Library</button>' +
       '<span class="browse-drilldown-title">' + (catMeta ? catMeta.icon + ' ' : '') + esc(catName) + '</span>' +
       '<span class="browse-drilldown-count">' + grouped.length + ' available</span>' +
     '</div>';
@@ -1989,13 +2044,9 @@ async function renderManage() {
           '<span style="flex:1"></span>' +
           '<button id="update-all-btn" class="manage-btn-action" onclick="triggerUpdate()" style="display:none">Update All</button>' +
         '</div>' +
-        '<details id="manage-stats-details" style="margin-top:8px">' +
-          '<summary style="cursor:pointer;font-size:12px;color:var(--text2);user-select:none">Server Stats</summary>' +
-          '<div id="manage-stats" style="margin-top:8px"></div>' +
-        '</details>';
+        '';
     }
     checkForUpdates();
-    loadManageStats();
   } catch(e) {
     const statusEl = document.getElementById('manage-status');
     if (statusEl) statusEl.innerHTML = '<h2>Library Status</h2><div style="color:var(--text2);font-size:13px">Could not load library status</div>';
@@ -2013,6 +2064,10 @@ async function renderManage() {
     }
   }
   refreshDownloads();
+  // Pre-fetch catalog in background so flavor pills can populate on installed tab
+  if (!_catalogCache) {
+    loadFullCatalog().then(() => { if (manageTab === 'installed') renderInstalled(); }).catch(() => {});
+  }
 }
 
 async function loadManageStats() {
@@ -2042,11 +2097,7 @@ async function loadManageStats() {
       }
     }
     if (m.rate_limited) h += '<div class="mc-row"><span class="mc-label">Rate limited</span><span class="mc-value" style="color:var(--amber)">' + m.rate_limited + '</span></div>';
-    if (d.disk_total_gb) {
-      const pct = d.disk_pct || 0;
-      const barColor = pct > 90 ? '#e74c3c' : pct > 75 ? 'var(--amber)' : 'var(--accent)';
-      h += '<div class="mc-row"><span class="mc-label">Disk</span><span class="mc-value">' + d.disk_used_gb + ' / ' + d.disk_total_gb + ' GB (' + pct + '%)</span></div>';
-      h += '<div style="height:6px;border-radius:3px;background:var(--surface2);margin-top:4px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:3px"></div></div>';
+    if (d.zim_size_gb) {
       h += '<div class="mc-row"><span class="mc-label">ZIM files</span><span class="mc-value">' + d.zim_size_gb + ' GB</span></div>';
     }
     el.innerHTML = h;
@@ -2140,7 +2191,18 @@ function renderInstalled(filterText) {
       if (dateStr) meta.push(dateStr);
       // Flavor badge from filename
       const flavor = variantLabel(z.file);
-      if (flavor) meta.push('<span style="color:var(--accent);font-weight:500">' + esc(flavor) + '</span>');
+      const variants = getFlavorVariants(z);
+      // Show flavor as clickable pill if alternatives exist, otherwise just text
+      if (variants.length > 1) {
+        const vid = '_fv_' + z.name;
+        window[vid] = variants;
+        meta.push('<span class="flavor-pill" onclick="showFlavorPicker(this, \'' + escAttr(z.name) + '\', window[\'' + vid + '\'])">' +
+          esc(flavor || 'Full') +
+          '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>' +
+        '</span>');
+      } else if (flavor) {
+        meta.push('<span style="color:var(--text2);font-weight:500">' + esc(flavor) + '</span>');
+      }
       const upd = _availableUpdates[z.file];
       let actionsHtml = '';
       if (upd) {
@@ -2149,7 +2211,6 @@ function renderInstalled(filterText) {
           '<button class="ci-delete-btn" onclick="deleteZim(\'' + escAttr(z.file) + '\', this)" title="Delete">\u00D7</button>';
       } else {
         actionsHtml = '<span class="ci-installed-badge">Installed</span>' +
-          '<button class="ci-switch-btn" onclick="switchFlavor(\'' + escAttr(z.title || z.name) + '\')" title="Switch flavor" style="font-size:11px;color:var(--text2);cursor:pointer;background:none;border:1px solid var(--border);border-radius:4px;padding:2px 6px;margin-left:4px">Switch</button>' +
           '<button class="ci-delete-btn" onclick="deleteZim(\'' + escAttr(z.file) + '\', this)" title="Delete">\u00D7</button>';
       }
       items_h += '<div class="catalog-item' + (upd ? ' ci-has-update' : '') + '">' +
@@ -2167,11 +2228,80 @@ function renderInstalled(filterText) {
   el.innerHTML = getInstalledPillsHtml() + items_h;
 }
 
-function switchFlavor(title) {
-  // Switch to Browse Library tab and search for this ZIM to show all flavors
-  switchManageTab('browse');
-  q.value = title;
-  browseCatalogFilter(title);
+function getFlavorVariants(installedZim) {
+  // Find catalog variants that match this installed ZIM's base name
+  if (!_catalogCache) return [];
+  // Installed file: "wikipedia_en_all_maxi_2024-05.zim" → base: "wikipedia_en_all"
+  const fb = (installedZim.file || '').replace(/\.zim$/, '');
+  const matching = _catalogCache.filter(item => {
+    return fb.startsWith(item.name + '_') || fb === item.name;
+  });
+  if (matching.length <= 1) return [];
+  // Build variant list with labels and sizes
+  const currentFlavor = variantLabel(installedZim.file) || 'Full';
+  return matching.map(item => ({
+    label: variantLabel(item.download_url) || 'Full',
+    size: formatSize(item.size_bytes),
+    url: item.download_url,
+    current: (variantLabel(item.download_url) || 'Full') === currentFlavor,
+  })).sort((a, b) => {
+    const order = { 'Mini': 0, 'No images': 1, 'Full': 2 };
+    return (order[a.label] ?? 1) - (order[b.label] ?? 1);
+  });
+}
+
+function showFlavorPicker(btn, zimName, variants) {
+  // Remove any existing popup
+  closeFlavorPopup();
+  const rect = btn.getBoundingClientRect();
+  // Backdrop to close on click outside
+  const backdrop = document.createElement('div');
+  backdrop.className = 'flavor-popup-backdrop';
+  backdrop.onclick = closeFlavorPopup;
+  document.body.appendChild(backdrop);
+  // Popup
+  const popup = document.createElement('div');
+  popup.className = 'flavor-popup';
+  popup.id = 'flavor-popup';
+  let html = '<div class="flavor-popup-title">Choose flavor</div>';
+  for (const v of variants) {
+    if (v.current) {
+      html += '<div class="flavor-option current">' +
+        '<div class="flavor-option-check">\u2713</div>' +
+        '<div class="flavor-option-label">' + esc(v.label) + '</div>' +
+        '<div class="flavor-option-size">' + esc(v.size) + '</div>' +
+      '</div>';
+    } else {
+      html += '<div class="flavor-option" onclick="switchToFlavor(\'' + escAttr(v.url) + '\', \'' + escAttr(zimName) + '\')">' +
+        '<div class="flavor-option-check"></div>' +
+        '<div class="flavor-option-label">' + esc(v.label) + '</div>' +
+        '<div class="flavor-option-size">' + esc(v.size) + '</div>' +
+      '</div>';
+    }
+  }
+  popup.innerHTML = html;
+  document.body.appendChild(popup);
+  // Position below the pill, clamped to viewport
+  const popW = popup.offsetWidth;
+  let left = rect.right - popW;
+  if (left < 8) left = 8;
+  let top = rect.bottom + 6;
+  if (top + popup.offsetHeight > window.innerHeight - 8) top = rect.top - popup.offsetHeight - 6;
+  popup.style.left = left + 'px';
+  popup.style.top = top + 'px';
+}
+
+function closeFlavorPopup() {
+  const popup = document.getElementById('flavor-popup');
+  if (popup) popup.remove();
+  const bd = document.querySelector('.flavor-popup-backdrop');
+  if (bd) bd.remove();
+}
+
+function switchToFlavor(downloadUrl, zimName) {
+  closeFlavorPopup();
+  // Find a nearby download button or create a virtual one for progress tracking
+  downloadZim(downloadUrl, null);
 }
 
 // ── Browse tab: explicit server-side catalog search (Search button / Enter in catalog-q) ──
@@ -2200,7 +2330,7 @@ async function searchCatalog(append) {
     let h = '';
     if (!append) {
       h += '<div class="browse-drilldown-header">' +
-        '<button class="browse-back" onclick="renderBrowseGallery();q.value=\'\'">\u2190 Back to library</button>' +
+        '<button class="browse-back" onclick="renderBrowseGallery();q.value=\'\'">\u2190 Browse Library</button>' +
         '<span class="browse-drilldown-count">' + esc(String(data.total)) + ' results</span></div>';
     }
     for (const item of grouped) h += renderCatalogItem(item);
@@ -2413,6 +2543,7 @@ async function refreshDownloads() {
         zimsCache = await lr.json();
         _catalogCache = null;
         _availableUpdates = {};
+        await loadFullCatalog().catch(() => {});
         renderInstalled();
         checkForUpdates();
         // Update status card counts
