@@ -4,7 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Zimi</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23f59e0b'/><text x='16' y='24' text-anchor='middle' font-family='system-ui' font-size='22' font-weight='700' fill='%230a0a0b'>Z</text></svg>">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="apple-touch-icon-precomposed" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="shortcut icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAADo0lEQVR4nM1XS4scVRT+zrm3qh+ZyQMaRxMQdBgNRM1iCAhqjIuIe/GBuIpxEcV/4MJNAmYniAuZ7LJL1IW4EomoqEEHt0oYxTct4xhH01Ndj3vk3Krq1Ey6x+r0JJMD1Y9Tt873ne/ec+4tYJuNNrlnivsOgEwQn4vns7oEqAKcO2gznqNNZB3vksg6Jw0B9wNmZmaORFH8lHPZfoACovFUENFYkjCbb5vN8Fy32/14I8ZGAj7z+fl5s7T0w1tpmhwXcRpoIlPxiBjWBguzs3e9tLi4mFWVoA0Sud279ywkSfKCiJQDr0//q+ZjEJEJguDM5ct/HS+xqgR0wWWdzh2PRNG/nzjn0soi3Arzi5CZbbM5dXh5+fdPS0wuBnigJFl73jlXik7D5fyfazgB79bYilH12eKPl0MEc5UquMbizI8ZKYsyZwIsjyRBBcYA05bP5qUmKstIu32KYIahF5ppCCW5EvkSGEXTKJYUNWo3Ayxp66RYA7z3TIC5PYR+QuByHUv+O3NA0xK++s3hiXciBFyve1mMYZ0mYWdb0yyoFT0yjgFxhEYItA2QCRBiiwhIIa1zwLPvJmjZXBGSfL6vxILXDzfw0D5CEhNOXkwgTkBW+9AWEChNY335ixsENZppX/D0fRYP7mVYQzh1McH7l1JMt8irgK2egqmwAGegFwP372MsPN5AwzIufJ/htS9i7GiSV6iu8TgENLCu3SQDQgbePtrAdIPQ/Vvw4kfRYLrG6d6MMc1nHwlOPxri0F4DlzJeudDH0opDO8hJ4kYRsAysrgmeO2Bx4qCiMd78Jsa57xLsbBHSwQZ+AwgYyuf93g7jjccaIGZ8/avDq5/3Md2kwZihjWrSRUiAz07lP3O0gU7b4OcVwZMf9PDPmgOCoicUg1sB1d7FbC0CBPQTwWlf79bX+4c/prhnl8Gh2yySLAfUz9gJPusmSDLxz01MgAiIUuDOXYyXHwiBlMEZ4dj+Jo4daANOs+f8mwx6PcHc+S6WM0FQoxvaOgp4IgB+WgV2aAPyLVjgMj0xadN3vhVrsD8jGasSbBk/353ompOrekMD/NETPHz+yrq5rR6Xqke3XioY3YkpKzZCv/3awuuPSES4BODIMOXUsRrXS21EJeR7Z44xwOTKTQRB6yyzbjFXfVXTrOpcI8ChsRWj6qPtPpTyhoE8O3v3iSAIF5jZUL6uzCSXxtBYGlNjV15Qbr0Xk1vi1QwVuykvp9tu/wHSK47GCFrSNAAAAABJRU5ErkJggg==">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -17,7 +20,8 @@
     font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
   }
 
-  body { background: var(--bg); color: var(--text); min-height: 100vh; padding-top: 56px; }
+  html { overflow: hidden; height: 100%; }
+  body { background: var(--bg); color: var(--text); min-height: 100vh; padding-top: 56px; overflow: hidden; height: 100%; }
 
   /* ── Topbar ── */
   .topbar {
@@ -47,7 +51,7 @@
   .topbar-breadcrumb { display: flex; align-items: center; gap: 8px; flex-shrink: 0; min-width: 0; }
   .bc-sep { color: var(--text2); font-size: 18px; opacity: 0.5; font-weight: 300; }
   .bc-icon { display: none; flex-shrink: 0; line-height: 0; cursor: pointer; }
-  .bc-icon img { width: 22px; height: 22px; border-radius: 5px; object-fit: cover; background: #fff; }
+  .bc-icon img { width: 18px; height: 18px; border-radius: 4px; object-fit: cover; background: #fff; padding: 1px; }
   .bc-icon .bc-letter {
     display: inline-flex; align-items: center; justify-content: center;
     width: 22px; height: 22px; border-radius: 5px;
@@ -153,7 +157,7 @@
     width: 64px; height: 64px; flex-shrink: 0; border-radius: 12px; overflow: hidden;
     background: var(--surface2); display: flex; align-items: center; justify-content: center;
   }
-  .sh-icon img { width: 64px; height: 64px; object-fit: cover; background: #fff; }
+  .sh-icon img { width: 58px; height: 58px; object-fit: cover; background: #fff; border-radius: 10px; padding: 2px; }
   .sh-info { flex: 1; min-width: 0; }
   .source-header h1 { font-size: 20px; font-weight: 600; color: var(--accent); margin: 0; }
   .sh-meta { font-size: 13px; color: var(--text2); margin-top: 4px; }
@@ -180,7 +184,7 @@
     background: var(--surface2); display: flex; align-items: center; justify-content: center;
     align-self: center;
   }
-  .card-icon img { width: 48px; height: 48px; object-fit: cover; background: #fff; border-radius: 8px; }
+  .card-icon img { width: 42px; height: 42px; object-fit: cover; background: #fff; border-radius: 8px; padding: 2px; }
   .icon-letter {
     font-size: 20px; font-weight: 700;
     background: linear-gradient(135deg, var(--amber), #f97316);
@@ -317,6 +321,7 @@
     border-color: var(--amber-border); background: var(--surface);
     outline: none;
   }
+  #main-view { overflow-y: auto; height: calc(100vh - 56px); overscroll-behavior: contain; }
   #main-view.hidden { display: none; }
 
   /* ── Manage page ── */
@@ -360,7 +365,7 @@
   .catalog-item:hover { border-color: var(--amber-border); }
   .catalog-item.ci-installed-item { opacity: 0.6; }
   .ci-icon { flex-shrink: 0; width: 40px; height: 40px; border-radius: 8px; overflow: hidden; background: var(--surface2); }
-  .ci-icon img { width: 40px; height: 40px; object-fit: cover; }
+  .ci-icon img { width: 34px; height: 34px; object-fit: cover; background: #fff; border-radius: 6px; padding: 2px; }
   .ci-icon .ci-letter {
     display: flex; align-items: center; justify-content: center;
     width: 40px; height: 40px; font-size: 16px; font-weight: 700; color: var(--accent);
@@ -561,6 +566,71 @@
   .pw-box button.pw-primary { background:var(--amber); color:#000; border-color:var(--amber); font-weight:600; }
   .pw-box .pw-error { color:#ef4444; font-size:12px; margin-top:8px; display:none; }
 
+  /* ── Desktop: onboarding + settings overlays ── */
+  .desktop-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+    z-index: 500; align-items: center; justify-content: center;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .desktop-overlay.open { display: flex; }
+  .desktop-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 32px; width: 480px; max-width: 90vw;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+  }
+  .desktop-card h2 {
+    font-size: 22px; font-weight: 700; margin: 0 0 8px;
+    background: linear-gradient(135deg, #f59e0b, #f97316);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .desktop-card .subtitle { font-size: 13px; color: var(--text2); line-height: 1.5; margin-bottom: 24px; }
+  .desktop-card label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .desktop-card .field-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  .desktop-card input[type="text"], .desktop-card input[type="number"] {
+    flex: 1; padding: 9px 12px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius); color: var(--text); font-size: 14px; font-family: inherit;
+  }
+  .desktop-card input[type="text"]:focus, .desktop-card input[type="number"]:focus {
+    outline: none; border-color: var(--amber-border);
+    box-shadow: 0 0 0 3px var(--amber-glow);
+  }
+  .desktop-card input[readonly] { color: var(--text2); cursor: default; }
+  .desktop-card .hint { font-size: 11px; color: var(--text2); opacity: 0.6; margin-top: -10px; margin-bottom: 16px; }
+  .desktop-card .checkbox-row {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 20px;
+    font-size: 13px; color: var(--text2); cursor: pointer;
+  }
+  .desktop-card .checkbox-row input { accent-color: var(--amber); }
+  .desktop-card .btn-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+  .desktop-card .btn-primary {
+    padding: 9px 24px; font-size: 14px; font-weight: 600; cursor: pointer;
+    background: linear-gradient(135deg, var(--amber), var(--amber2));
+    color: #000; border: none; border-radius: var(--radius); transition: opacity 0.2s;
+  }
+  .desktop-card .btn-primary:hover { opacity: 0.85; }
+  .desktop-card .btn-primary:disabled { opacity: 0.4; cursor: default; }
+  .desktop-card .btn-secondary {
+    padding: 9px 18px; font-size: 13px; cursor: pointer;
+    background: var(--surface2); color: var(--text); border: 1px solid var(--border);
+    border-radius: var(--radius); transition: all 0.2s;
+  }
+  .desktop-card .btn-secondary:hover { border-color: var(--amber-border); }
+  .desktop-card .btn-browse {
+    padding: 9px 14px; font-size: 13px; cursor: pointer; white-space: nowrap;
+    background: var(--surface2); color: var(--text); border: 1px solid var(--border);
+    border-radius: var(--radius); transition: all 0.2s; flex-shrink: 0;
+  }
+  .desktop-card .btn-browse:hover { border-color: var(--amber-border); color: var(--amber); }
+  .desktop-card .restart-msg,
+  .settings-restart-msg {
+    display: none; padding: 10px 14px; margin-top: 12px;
+    background: rgba(245, 158, 11, 0.08); border: 1px solid var(--amber-border);
+    border-radius: var(--radius); font-size: 13px; color: var(--amber);
+    text-align: center;
+  }
+  .desktop-card .restart-msg.show,
+  .settings-restart-msg.show { display: block; }
+
   /* ── Card category badge (inline in detail row) ── */
   .card-cat { font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
 
@@ -573,6 +643,30 @@
   .star-btn:hover { opacity: 1; color: var(--amber); transform: scale(1.2); }
   .star-btn.starred { opacity: 1; color: var(--amber); }
   .stat-card { position: relative; }
+
+  /* ── Context menu ── */
+  #zim-ctx-menu {
+    position: fixed; z-index: 9999; min-width: 180px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    padding: 4px 0; display: none; user-select: none;
+  }
+  #zim-ctx-menu.visible { display: block; }
+  .ctx-item {
+    padding: 8px 16px; font-size: 13px; color: var(--text); cursor: pointer;
+    transition: background 0.1s; white-space: nowrap; position: relative;
+  }
+  .ctx-item:hover { background: var(--amber-glow); color: var(--amber); }
+  .ctx-item.danger:hover { background: rgba(239,68,68,0.08); color: #ef4444; }
+  .ctx-sep { height: 1px; background: var(--border); margin: 4px 0; }
+  .ctx-sub {
+    display: none; position: absolute; left: 100%; top: -4px;
+    min-width: 170px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    padding: 4px 0; z-index: 10000;
+  }
+  .ctx-sub.flip-left { left: auto; right: 100%; }
+  .ctx-item:hover > .ctx-sub { display: block; }
 
   /* ── Collections manage ── */
   .coll-form { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
@@ -590,8 +684,9 @@
   .coll-item {
     display: flex; align-items: center; gap: 12px; padding: 12px 14px;
     background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-    margin-bottom: 6px; font-size: 13px;
+    margin-bottom: 6px; font-size: 13px; cursor: pointer;
   }
+  .coll-item:hover { border-color: var(--amber-border); }
   .coll-item .coll-name { font-weight: 600; color: var(--accent); }
   .coll-item .coll-zims { flex: 1; color: var(--text2); font-size: 12px; }
   .coll-item .coll-del {
@@ -625,6 +720,7 @@
   <a href="#" id="random-btn" class="random-btn" title="Random article (R)" onclick="randomArticle(event)"><span class="dice">&#x1F3B2;</span></a>
   <a href="#" id="manage-btn" class="manage-btn" title="Library Manager" onclick="toggleManage(event)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></a>
   <a id="newtab-btn" class="newtab-btn" href="#" target="_blank" rel="noopener" title="Open in new tab"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>
+
 </nav>
 
 <div id="pw-overlay" class="pw-overlay" onclick="if(event.target===this)closePwModal()">
@@ -643,6 +739,54 @@
       <button type="submit" class="pw-primary">OK</button>
     </div>
   </form>
+</div>
+
+<!-- Desktop: Onboarding overlay (first-run) -->
+<div id="desktop-onboarding" class="desktop-overlay" onclick="if(event.target===this)return">
+  <div class="desktop-card">
+    <h2>Welcome to Zimi</h2>
+    <p class="subtitle">Choose where to keep your offline knowledge archives.</p>
+    <p class="subtitle" style="font-size:11px;opacity:0.5;margin-top:-16px;margin-bottom:24px">ZIM files can be large (Wikipedia is ~100 GB) — pick a drive with plenty of space.</p>
+    <label>ZIM folder</label>
+    <div class="field-row">
+      <input type="text" id="onboard-path" readonly placeholder="Choose a folder...">
+      <button class="btn-browse" onclick="desktopChooseFolder('onboard-path')">Choose Folder</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" id="onboard-start" onclick="desktopFinishOnboarding()" disabled>Get Started</button>
+    </div>
+  </div>
+</div>
+
+<!-- Server Settings overlay -->
+<div id="settings-overlay" class="desktop-overlay" onclick="if(event.target===this)closeSettings()">
+  <div class="desktop-card">
+    <h2>Server Settings</h2>
+    <p class="subtitle">Configure your Zimi server.</p>
+    <label>ZIM folder</label>
+    <div class="field-row">
+      <input type="text" id="settings-dir" readonly placeholder="/path/to/zims">
+      <button class="btn-browse" id="settings-browse-btn" onclick="settingsChooseFolder()" style="display:none">Choose Folder</button>
+    </div>
+    <label id="settings-port-label">Port</label>
+    <div class="field-row" id="settings-port-row">
+      <input type="number" id="settings-port" min="1024" max="65535" value="8899">
+    </div>
+    <div class="hint" id="settings-hint">Changes require a server restart to take effect.</div>
+    <div id="settings-browser-link" style="display:none;margin-top:8px;margin-bottom:16px;padding:12px 14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius)">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span id="settings-browser-label" style="font-size:12px;color:var(--text2)">Access from any browser on this computer</span>
+        <a id="settings-browser-url" href="#" target="_blank" rel="noopener" style="color:var(--amber);font-size:13px;font-weight:600;text-decoration:none"></a>
+      </div>
+    </div>
+    <div class="settings-restart-msg" id="settings-restart-msg"></div>
+    <div class="btn-row">
+      <button class="btn-secondary" onclick="settingsRefreshCache()">Refresh Cache</button>
+      <span style="flex:1"></span>
+      <button class="btn-secondary" onclick="closeSettings()">Cancel</button>
+      <button class="btn-primary" id="settings-save-btn" onclick="settingsSave()">Save</button>
+    </div>
+  </div>
 </div>
 
 <noscript>
@@ -672,8 +816,9 @@
 
 <div id="reader" class="reader-view">
   <div class="reader-loading" id="reader-loading"><div class="spinner"></div><span>Loading...</span></div>
-  <iframe id="reader-frame" title="Article content" sandbox="allow-same-origin allow-scripts allow-popups"></iframe>
+  <iframe id="reader-frame" title="Article content" sandbox="allow-same-origin allow-scripts allow-popups allow-downloads"></iframe>
 </div>
+<div id="zim-ctx-menu"></div>
 
 <script>
 // ── State ──
@@ -682,6 +827,7 @@ let currentSource = null;
 let readerOpen = false;
 let readerSource = null; // ZIM name of what's in reader (for topbar badge when no explicit source)
 let sourceAutoReader = false; // true when enterSource auto-opened the reader (non-zimgit homepage)
+let _popstateNoAutoReader = false; // suppress auto-reader on popstate navigation
 let zimsCache = null;
 let manageEnabled = false;
 let activeCategories = new Set();
@@ -702,6 +848,7 @@ let visibleResultCount = RESULTS_PER_PAGE;
 
 function fmtSize(gb) { return gb < 0.1 ? Math.max(1, Math.round(gb * 1024)) + ' MB' : gb < 10 ? gb.toFixed(1) + ' GB' : Math.round(gb) + ' GB'; }
 function fmtSizeHtml(gb) { if (gb < 0.1) return '<span class="num">' + Math.max(1, Math.round(gb * 1024)) + '</span> MB'; if (gb < 10) return '<span class="num">' + gb.toFixed(1) + '</span> GB'; return '<span class="num">' + Math.round(gb) + '</span> GB'; }
+function pl(n, singular, plural) { return n + ' ' + (n === 1 ? singular : (plural || singular + 's')); }
 
 // ── DOM refs ──
 const q = document.getElementById('q');
@@ -840,7 +987,7 @@ function updateTopbar() {
       const catMeta = BROWSE_CATEGORIES.find(c => c.key === manageCategoryFilter);
       q.placeholder = 'Search in ' + (catMeta ? catMeta.name : manageCategoryFilter) + '...';
     } else {
-      q.placeholder = 'Search Kiwix library...';
+      q.placeholder = 'Search catalog...';
     }
   } else if (homeScope) {
     q.placeholder = 'Search ' + homeScope.label + '...';
@@ -898,7 +1045,10 @@ async function init() {
       if (hdata.version) document.getElementById('footer-version').textContent = hdata.version + ' ';
     }
   } catch(e) {}
+  // Set initial history state so browser back always has a valid SPA state
+  if (!history.state) history.replaceState({ mode: 'home' }, '', location.href);
   route(false);
+  _desktopCheckOnboarding();
 }
 
 function route(push) {
@@ -918,7 +1068,7 @@ function route(push) {
       if (qParam) {
         enterSource(name, false);
         q.value = qParam;
-        doSearch(qParam);
+        doSearch(qParam, false);
         return;
       }
       // If URL has an article path, open the article directly
@@ -956,7 +1106,7 @@ function route(push) {
   if (qParam) {
     enterHome(false);
     q.value = qParam;
-    doSearch(qParam);
+    doSearch(qParam, false);
     return;
   }
   if (zimsCache && zimsCache.length === 1) {
@@ -1042,6 +1192,9 @@ function enterScope(type, label, zimNames, push) {
   activeSourceFilters.clear();
   hideSuggest();
   if (push) history.pushState({ mode: 'home', scope: homeScope }, '', '/?scope=' + encodeURIComponent(type + ':' + label));
+  var t = label + ' \u2014 Zimi';
+  document.title = t;
+  _setWindowTitle(t);
   updateTopbar();
   renderHome();
 }
@@ -1058,6 +1211,9 @@ async function enterSource(name, push) {
   activeSourceFilters.clear();
   hideSuggest();
   if (push) history.pushState({ mode: 'source', source: name }, '', '/w/' + encodeURIComponent(name));
+  var t = (info.title || name) + ' \u2014 Zimi';
+  document.title = t;
+  _setWindowTitle(t);
   updateTopbar();
   await renderSource(name);
 }
@@ -1068,7 +1224,7 @@ function renderHome(filter) {
     statsBar.innerHTML = ''; statsBar.style.display = 'none';
     pillsBar.innerHTML = ''; pillsBar.style.display = 'none';
     output.innerHTML = '<div class="empty"><p>No knowledge sources found</p><p class="hint">Add ZIM files to get started</p>'
-      + (manageEnabled ? '<a href="/?manage" onclick="event.preventDefault();enterManage();setTimeout(function(){switchManageTab(\'browse\')},50)" style="display:inline-block;margin-top:16px;color:var(--amber);font-weight:500;font-size:14px;text-decoration:none;border-bottom:1px solid var(--amber-border)">Browse Library \u2192</a>' : '')
+      + (manageEnabled ? '<a href="/?manage" onclick="event.preventDefault();enterManage();setTimeout(function(){switchManageTab(\'browse\')},50)" style="display:inline-block;margin-top:16px;color:var(--amber);font-weight:500;font-size:14px;text-decoration:none;border-bottom:1px solid var(--amber-border)">Catalog \u2192</a>' : '')
       + '</div>';
     return;
   }
@@ -1155,7 +1311,7 @@ function renderHome(filter) {
         const collZims = (coll.zims || []).map(n => zimsCache.find(z => z.name === n)).filter(Boolean);
         if (collZims.length > 0) {
           const collZimNames = collZims.map(z => z.name);
-          h += '<div class="cat-heading clickable" onclick="enterScope(\'collection\',\'' + escAttr(coll.label || cname) + '\',' + escAttr(JSON.stringify(collZimNames)) + ',true)">' + esc(coll.label || cname) + '</div>';
+          h += '<div class="cat-heading clickable" onclick="enterScope(\'collection\',\'' + escJs(coll.label || cname) + '\',' + escJs(JSON.stringify(collZimNames)) + ',true)">' + esc(coll.label || cname) + '</div>';
           h += renderCardGrid(collZims, true, true);
         }
       }
@@ -1194,15 +1350,15 @@ function renderCardGrid(items, showStars, showCategory) {
     const starHtml = showStars
       ? '<button class="star-btn' + (isFav ? ' starred' : '') + '" onclick="event.stopPropagation();toggleFavorite(\'' + escAttr(z.name) + '\')" title="' + (isFav ? 'Remove from favorites' : 'Add to favorites') + '">' + (isFav ? '\u2605' : '\u2606') + '</button>'
       : '';
-    const catSuffix = showCategory && z.category ? ' &middot; <span class="card-cat">' + esc(z.category) + '</span>' : '';
-    return '<div class="stat-card" tabindex="0" role="button" onclick="enterSource(\'' + escAttr(z.name) + '\', true)" onkeydown="if(event.key===\'Enter\')enterSource(\'' + escAttr(z.name) + '\', true)">' +
+    const catPrefix = showCategory && z.category ? '<span class="card-cat">' + esc(z.category) + '</span> &middot; ' : '';
+    return '<div class="stat-card" tabindex="0" role="button" onclick="enterSource(\'' + escJs(z.name) + '\', true)" onkeydown="if(event.key===\'Enter\')enterSource(\'' + escJs(z.name) + '\', true)">' +
       starHtml +
       '<div class="card-icon">' + icon + '</div>' +
       '<div class="card-info">' +
         '<div class="name">' + esc(z.title || z.name) + '</div>' +
         (z.description ? '<div class="desc">' + esc(z.description) + '</div>' : '') +
-        '<div class="detail">' + (typeof z.entries === 'number' ? z.entries.toLocaleString() + ' entries' : '') +
-        ' &middot; ' + fmtSize(z.size_gb) + catSuffix + '</div>' +
+        '<div class="detail">' + catPrefix + (typeof z.entries === 'number' ? z.entries.toLocaleString() + ' entries' : '') +
+        ' &middot; ' + fmtSize(z.size_gb) + '</div>' +
       '</div></div>';
   }).join('') + '</div>';
 }
@@ -1231,6 +1387,142 @@ function toggleCategory(cat) {
   renderHome();
 }
 
+// ── Context menu for homepage ZIM cards ──
+(function() {
+  const menu = document.getElementById('zim-ctx-menu');
+  if (!menu) return;
+  let _ctxZim = null;
+  let _ctxCard = null;
+  let _ctxX = 0, _ctxY = 0;
+
+  function closeCtx() { menu.classList.remove('visible'); _ctxZim = null; _ctxCard = null; }
+
+  function posMenu(x, y) {
+    menu.style.left = '0'; menu.style.top = '0';
+    menu.classList.add('visible');
+    var mw = menu.offsetWidth, mh = menu.offsetHeight;
+    var finalX = Math.min(x, window.innerWidth - mw - 8);
+    menu.style.left = finalX + 'px';
+    menu.style.top = Math.min(y, window.innerHeight - mh - 8) + 'px';
+    // Flip submenu left if menu is near right edge
+    var sub = menu.querySelector('.ctx-sub');
+    if (sub) {
+      if (finalX + mw + 170 > window.innerWidth) sub.classList.add('flip-left');
+      else sub.classList.remove('flip-left');
+    }
+  }
+
+  function showMainMenu() {
+    var zim = _ctxZim;
+    var favs = (collectionsCache && collectionsCache.favorites) || [];
+    var isFav = favs.includes(zim);
+    var colls = (collectionsCache && collectionsCache.collections) || {};
+    var h = '<div class="ctx-item" data-action="open">Open</div>';
+    h += '<div class="ctx-item" data-action="newtab">Open in New Tab</div>';
+    h += '<div class="ctx-sep"></div>';
+    h += '<div class="ctx-item" data-action="favorite">' + (isFav ? 'Remove from Favorites' : 'Add to Favorites') + '</div>';
+    // Collections submenu (hover to expand)
+    h += '<div class="ctx-item">Collections \u203A<div class="ctx-sub">';
+    for (var cName in colls) {
+      var coll = colls[cName];
+      var inColl = (coll.zims || []).indexOf(zim) >= 0;
+      h += '<div class="ctx-item" data-action="toggle-coll" data-coll="' + escAttr(cName) + '">' +
+        (inColl ? '\u2713 ' : '') + esc(coll.label || cName) + '</div>';
+    }
+    if (Object.keys(colls).length > 0) h += '<div class="ctx-sep"></div>';
+    h += '<div class="ctx-item" data-action="new-collection">New Collection\u2026</div>';
+    h += '</div></div>';
+    if (manageEnabled) {
+      h += '<div class="ctx-sep"></div>';
+      h += '<div class="ctx-item danger" data-action="delete">Delete</div>';
+    }
+    menu.innerHTML = h;
+    posMenu(_ctxX, _ctxY);
+  }
+
+  document.addEventListener('contextmenu', function(e) {
+    var card = e.target.closest('.stat-card');
+    if (!card) { closeCtx(); return; }
+    e.preventDefault();
+    // Prevent text selection
+    window.getSelection().removeAllRanges();
+    var m = (card.getAttribute('onclick') || '').match(/enterSource\('([^']+)'/);
+    if (!m) return;
+    _ctxZim = m[1];
+    _ctxCard = card;
+    _ctxX = e.clientX + 2;
+    _ctxY = e.clientY + 2;
+    showMainMenu();
+  });
+
+  // Prevent text selection on stat-cards during mousedown
+  document.addEventListener('mousedown', function(e) {
+    if (e.button === 2 && e.target.closest('.stat-card')) {
+      e.preventDefault();
+    }
+  });
+
+  menu.addEventListener('click', function(e) {
+    var item = e.target.closest('[data-action]');
+    if (!item) return;
+    var action = item.dataset.action;
+    var zim = _ctxZim;
+    var card = _ctxCard;
+    e.stopPropagation();
+
+    if (action === 'open') {
+      closeCtx(); enterSource(zim, true);
+    } else if (action === 'newtab') {
+      closeCtx(); window.open('/w/' + encodeURIComponent(zim), '_blank');
+    } else if (action === 'favorite') {
+      closeCtx(); toggleFavorite(zim);
+    } else if (action === 'toggle-coll') {
+      var collName = item.dataset.coll;
+      closeCtx();
+      var data = collectionsCache || {favorites: [], collections: {}};
+      var coll = data.collections && data.collections[collName];
+      if (!coll) return;
+      var zims = coll.zims ? coll.zims.slice() : [];
+      var idx = zims.indexOf(zim);
+      if (idx >= 0) zims.splice(idx, 1); else zims.push(zim);
+      manageFetch('/collections', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: collName, label: coll.label || collName, zims: zims})
+      }).then(function(res) { if (res.ok) { coll.zims = zims; renderHome(); } });
+    } else if (action === 'new-collection') {
+      closeCtx();
+      var name = prompt('Collection name:');
+      if (!name || !name.trim()) return;
+      var slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_');
+      manageFetch('/collections', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: slug, label: name.trim(), zims: [zim]})
+      }).then(function(res) { return res.json(); }).then(function() {
+        fetch('/collections').then(function(r) { return r.json(); }).then(function(c) {
+          collectionsCache = c; renderHome();
+        });
+      });
+    } else if (action === 'delete') {
+      closeCtx();
+      var zinfo = zimsCache && zimsCache.find(function(z) { return z.name === zim; });
+      if (!zinfo || !zinfo.file) return;
+      if (!confirm('Delete "' + (zinfo.title || zim) + '"?')) return;
+      // Optimistic: remove card immediately
+      if (card) card.style.display = 'none';
+      zimsCache = zimsCache.filter(function(z) { return z.name !== zim; });
+      manageFetch('/manage/delete', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filename: zinfo.file})
+      }).then(function() {
+        renderHome();
+      });
+    }
+  });
+
+  document.addEventListener('click', function(e) { if (!menu.contains(e.target)) closeCtx(); });
+  document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeCtx(); });
+})();
+
 // ── Render: Source ──
 async function renderSource(name) {
   const info = zimsCache.find(z => z.name === name);
@@ -1253,8 +1545,9 @@ async function renderSource(name) {
     '</div></div>';
 
   // For ZIMs with a homepage, go straight to reader (skip intermediate page)
+  // Unless navigating back via popstate — show the source page instead
   const isZimgit = name.startsWith('zimgit-');
-  if (info.main_path && !isZimgit) {
+  if (info.main_path && !isZimgit && !_popstateNoAutoReader) {
     sourceHeaderEl.style.display = 'none';
     output.innerHTML = '';
     sourceAutoReader = true;
@@ -1276,7 +1569,7 @@ async function renderSource(name) {
       output.innerHTML = '<div class="cat-heading">' + esc(String(data.count)) + ' Documents</div>' +
         '<div class="results">' + data.documents.map((d, i) => {
           const hasPath = !!d.path;
-          const clickAttr = hasPath ? ' onclick="openArticle(\'' + escAttr(name) + '\', \'' + escAttr(d.path) + '\')" onkeydown="if(event.key===\'Enter\')openArticle(\'' + escAttr(name) + '\', \'' + escAttr(d.path) + '\')"' : '';
+          const clickAttr = hasPath ? ' onclick="openArticle(\'' + escJs(name) + '\', \'' + escJs(d.path) + '\')" onkeydown="if(event.key===\'Enter\')openArticle(\'' + escJs(name) + '\', \'' + escJs(d.path) + '\')"' : '';
           return '<div class="result"' + (hasPath ? ' tabindex="0" role="button"' : '') + ' style="animation-delay:' + (i * 0.04) + 's"' + clickAttr + '>' +
             '<div class="title">' + esc(d.title) + '</div>' +
             (d.description ? '<div class="snippet">' + esc(d.description) + '</div>' : '') +
@@ -1378,7 +1671,8 @@ q.addEventListener('keydown', e => {
 });
 
 
-async function doSearch(query) {
+async function doSearch(query, push) {
+  if (push === undefined) push = true;
   if (!query) return;
   clearTimeout(suggestTimer);
   hideSuggest();
@@ -1432,7 +1726,16 @@ async function doSearch(query) {
     d1._clientElapsed = phase1Elapsed;
     d1._query = query;
     allResults = d1;
-    history.pushState({ mode: 'search', query: query, source: scope }, '', searchUrl);
+    if (push) {
+      // Replace (not push) if we're already on a search page — prevents duplicate entries
+      // from autosearch timer + Enter key both calling doSearch
+      var hs = history.state;
+      if (hs && hs.mode === 'search') {
+        history.replaceState({ mode: 'search', query: query, source: scope }, '', searchUrl);
+      } else {
+        history.pushState({ mode: 'search', query: query, source: scope }, '', searchUrl);
+      }
+    }
     renderSearchResults(allResults, scope);
 
     if (d1.partial) {
@@ -1557,7 +1860,7 @@ function renderSearchResults(data, scope) {
         const icon = z.has_icon
           ? '<img src="/w/' + encodeURIComponent(z.name) + '/-/icon" width="48" height="48" loading="lazy">'
           : '<span class="icon-letter">' + esc(z.title || z.name)[0].toUpperCase() + '</span>';
-        return '<div class="stat-card" tabindex="0" role="button" onclick="enterSource(\'' + escAttr(z.name) + '\', true)" onkeydown="if(event.key===\'Enter\')enterSource(\'' + escAttr(z.name) + '\', true)">' +
+        return '<div class="stat-card" tabindex="0" role="button" onclick="enterSource(\'' + escJs(z.name) + '\', true)" onkeydown="if(event.key===\'Enter\')enterSource(\'' + escJs(z.name) + '\', true)">' +
           '<div class="card-icon">' + icon + '</div>' +
           '<div class="card-info">' +
             '<div class="name">' + esc(z.title || z.name) + '</div>' +
@@ -1578,7 +1881,7 @@ function renderSearchResults(data, scope) {
       ? '<div class="result-source">' + _sourceIconHtml(r.zim, 20) +
         '<span class="rs-name">' + esc(_zimTitle(r.zim)) + '</span></div>'
       : '';
-    return '<div class="result" tabindex="0" role="button" data-zim="' + escAttr(r.zim) + '" data-path="' + escAttr(r.path) + '" style="animation-delay:' + (Math.min(i, 5) * 0.04) + 's" onclick="openArticle(\'' + escAttr(r.zim) + '\', \'' + escAttr(r.path) + '\')" onkeydown="if(event.key===\'Enter\')openArticle(\'' + escAttr(r.zim) + '\', \'' + escAttr(r.path) + '\')">' +
+    return '<div class="result" tabindex="0" role="button" data-zim="' + escAttr(r.zim) + '" data-path="' + escAttr(r.path) + '" style="animation-delay:' + (Math.min(i, 5) * 0.04) + 's" onclick="openArticle(\'' + escJs(r.zim) + '\', \'' + escJs(r.path) + '\')" onkeydown="if(event.key===\'Enter\')openArticle(\'' + escJs(r.zim) + '\', \'' + escJs(r.path) + '\')">' +
       sourceRow +
       '<div class="title">' + esc(r.title) + '</div>' +
       (r.snippet ? '<div class="snippet">' + esc(r.snippet) + '</div>' : '<div class="snippet" data-needs-snippet="1"></div>') +
@@ -1814,13 +2117,12 @@ const BROWSE_CATEGORIES = [
   { key: 'stack_exchange', name: 'Q&A Communities',      icon: '\u{1F4AC}', desc: 'Stack Overflow, Ask Ubuntu, cooking, DIY, science' },
   { key: 'devdocs',        name: 'Dev & Tech Docs',      icon: '\u{1F4BB}', desc: 'Language references, Linux wikis, programming tutorials' },
   { key: 'ted',            name: 'Video & Talks',        icon: '\u{1F3AC}', desc: 'TED talks by topic \u2014 multilingual' },
-  { key: 'education',      name: 'Education & Textbooks', icon: '\u{1F393}', desc: 'Khan Academy, LibreTexts, CrashCourse, PhET, and more' },
+  { key: 'education',      name: 'Education & How-To',   icon: '\u{1F393}', desc: 'Khan Academy, iFixit, WikiHow, CrashCourse, and more' },
   { key: 'gutenberg',      name: 'Books & Literature',   icon: '\u{1F4DA}', desc: 'Project Gutenberg \u2014 public domain books' },
   { key: 'medical',        name: 'Medical & Health',     icon: '\u{1FA7A}', desc: 'WikiMed, MedlinePlus, CDC, NHS, field medicine' },
   { key: 'survival',       name: 'Survival & Preparedness', icon: '\u{1F9ED}', desc: 'Emergency guides, prepping, off-grid, water treatment' },
   { key: 'gaming',         name: 'Gaming & Fandom',      icon: '\u{1F3AE}', desc: 'Minecraft, Pok\u00E9mon, D&D, Stardew Valley, and more' },
-  { key: 'ifixit',         name: 'How-To & Repair',      icon: '\u{1F527}', desc: 'iFixit, WikiHow, and practical guides' },
-  { key: 'other',          name: 'Other',                icon: '\u{1F4E6}', desc: 'Cooking, music, finance, and more' },
+  { key: 'other',          name: 'Other',                icon: '\u{1F4E6}', desc: 'Miscellaneous and uncategorized archives' },
 ];
 
 // Language display: "Multilingual (24 langs)" or "French" instead of raw codes
@@ -1845,46 +2147,60 @@ function formatLanguage(langStr) {
   return 'Multilingual (' + codes.length + ' langs)';
 }
 
-// Auto-categorize items that Kiwix OPDS leaves uncategorized
+// OPDS category → browse category mapping (case-insensitive)
+// All 17 known OPDS categories mapped to our 9 browse categories
+const _OPDS_CAT_MAP = {
+  'wikipedia':'wikipedia', 'wikibooks':'wikipedia', 'wikiquote':'wikipedia',
+  'wikisource':'wikipedia', 'wikiversity':'wikipedia', 'wikinews':'wikipedia',
+  'wikivoyage':'wikipedia', 'wiktionary':'wikipedia', 'vikidia':'wikipedia',
+  'stack_exchange':'stack_exchange',
+  'ted':'ted',
+  'gutenberg':'gutenberg',
+  'mooc':'education', 'phet':'education',
+  'ifixit':'education',  // iFixit, WikiHow → Education & How-To
+};
+
 function autoCategorize(item) {
-  const cat = item.category;
+  const cat = (item.category || '').toLowerCase();
   const n = (item.name || '').toLowerCase();
-  // Merge tiny Wikimedia sub-categories into wikipedia
-  if (/^wiki(books|quote|source|news|versity)|^vikidia|^wiktionary/.test(cat)) return 'wikipedia';
-  if (cat && cat !== 'other') return cat;
-  // Dev & tech docs
-  if (n.startsWith('devdocs_') || /freecodecamp|mdn_/.test(n)) return 'devdocs';
-  if (/^docs\.|^peps\.|php\.net|dart\.dev|getbootstrap|gobyexample|lesscss|lua\.org|mankier/.test(n)) return 'devdocs';
-  if (/archlinux|alpinelinux|gentoo|installgentoo|termux|postmarketos|unrealircd|neos-wiki/.test(n)) return 'devdocs';
-  if (/devhints|cheatography|coreyms_|cloudflare\.com|htdp\.org|opendatastructures|jeffe\.cs/.test(n)) return 'devdocs';
-  if (/blender\.org|openzim|thalesdoc/.test(n)) return 'devdocs';
-  // Stack Exchange
-  if (/stackoverflow|stackexchange|askubuntu|superuser|serverfault/.test(n)) return 'stack_exchange';
-  // Education & textbooks
-  if (/crashcourse|phet|artofproblemsolving|coursera|khan|openstax|mooc|explainxkcd|coreeng/.test(n)) return 'education';
-  if (/libretexts|milneopentextbooks|oer4schools|learningstatistics|lost-stats|mspeekenbrink/.test(n)) return 'education';
-  if (/planetmath|proofwiki|stacks\.math|voa_learning|ethanweed|edu\.gcfglobal|scienceinthebath/.test(n)) return 'education';
-  if (/biologycourses|genomicseducation|ncert|ghana-bece|diksha|booksdash|prunelle|project-fuel/.test(n)) return 'education';
-  if (/internet-encyclopedia|encyclopedie-environnement|cd3wdproject|noted\.lol|smbc-comics/.test(n)) return 'education';
-  if (/appropedia|energypedia|citizendium|metakgp/.test(n)) return 'education';
+  // 1. Map known OPDS categories (covers ~730 of 1074 items)
+  if (_OPDS_CAT_MAP[cat]) return _OPDS_CAT_MAP[cat];
+  // 2. For empty/other categories, classify by name (~344 items)
   // Wikipedia family
-  if (/^wiki[a-z]|^wikt|openstreetmap-wiki|mediawiki/.test(n)) return 'wikipedia';
-  // Books
-  if (/gutenberg|rationalwiki|factbook/.test(n)) return 'gutenberg';
-  // TED
+  if (/^wiki[a-z]|^wikt|mediawiki|openstreetmap-wiki/.test(n)) return 'wikipedia';
+  // Dev & tech docs
+  if (n.startsWith('devdocs_') || n.startsWith('coreyms_')) return 'devdocs';
+  if (/freecodecamp|mdn_|^docs\.|^peps\.|php\.net|archlinux|alpinelinux/.test(n)) return 'devdocs';
+  if (/gentoo|termux|postmarketos|neos-wiki|unrealircd|bitcoin|cheatography/.test(n)) return 'devdocs';
+  if (/devhints|cloudflare|getbootstrap|gobyexample|dart\.dev|lesscss/.test(n)) return 'devdocs';
+  if (/lua\.org|100r\.co|htdp\.org|opendatastructures|jeffe\.cs/.test(n)) return 'devdocs';
+  if (/anonymousplanet|openzim|thalesdoc|mankier/.test(n)) return 'devdocs';
+  // Q&A
+  if (/stackoverflow|stackexchange|askubuntu|superuser|serverfault/.test(n)) return 'stack_exchange';
+  // Education (broad — catches tutorials, courses, how-to, reference)
+  if (/libretexts|crashcourse|phet|khan|openstax|coursera|explainxkcd/.test(n)) return 'education';
+  if (/planetmath|mspeekenbrink|voa_learning|prunelle|bogleheads|finiki/.test(n)) return 'education';
+  if (/citizendium|metakgp|appropedia|internet-encyclopedia|artofproblemsolving/.test(n)) return 'education';
+  if (/edutechwiki|womenshistory|chopin\.lib|hitchwiki|football/.test(n)) return 'education';
+  if (/biology|statistic|stats|learning|genomics|energypedia|proofwiki|ethanweed/.test(n)) return 'education';
+  if (/stacks\.math|ncase\.me|encyclopedie|diksha|ghana-bece|ncert/.test(n)) return 'education';
+  if (/oer4schools|scienceinthebath|edu\.gcf|project-fuel|citizensinformation/.test(n)) return 'education';
+  if (/ifixit|wikihow|cooking|publicdomainrecipes|restarters|grimgrains/.test(n)) return 'education';
+  if (/music|mutopia|ragajunglism|tonedear|dalitio|fretmap|blender\.org|tomlehr/.test(n)) return 'education';
+  if (/milneopentextbooks|theworldfactbook/.test(n)) return 'education';
+  // Books & literature
+  if (/gutenberg|rationalwiki|booksdash|xkcd|smbc-comics|noted\.lol|incognitocat/.test(n)) return 'gutenberg';
+  // TED & video
   if (/^ted_/.test(n)) return 'ted';
-  // Medical & health
-  if (/medicine|wikem|medlineplus|military[._-]medicine|fas-military/.test(n)) return 'medical';
-  if (/mdwiki|librepathology|nhs\.uk|wwwnc\.cdc|skin-of-color/.test(n)) return 'medical';
+  // Medical
+  if (/medicine|medlineplus|mdwiki|librepathology|wikem|cdc\.gov|skin-of-color/.test(n)) return 'medical';
   // Survival & preparedness
-  if (/canadian_prep|urban-prepper|survivorlibrary|s2underground|lrnselfreliance/.test(n)) return 'survival';
-  if (/ready\.gov|zimgit-|armypubs|anonymousplanet|incognitocat|solar\.lowtech|off-the-grid/.test(n)) return 'survival';
+  if (/zimgit-|ready\.gov|survivorlibrary|urban-prepper|solar\.lowtech/.test(n)) return 'survival';
+  if (/canadian_prep|armypubs|cd3wd|selfreliance|s2underground|usda-2015/.test(n)) return 'survival';
   // Gaming & fandom
-  if (/dandwiki|evageeks|frackinuniverse|granbluefantasy|bulbagarden|pokemonwiki/.test(n)) return 'gaming';
-  if (/minecraftwiki|rimworldwiki|riskofrain2|stardewvalleywiki|westeros|whitewolfwiki/.test(n)) return 'gaming';
-  if (/the_infosphere|zdoom|allthetropes|xkcd\.com/.test(n)) return 'gaming';
-  // iFixit / how-to
-  if (/ifixit|wikihow|restarters/.test(n)) return 'ifixit';
+  if (/dandwiki|evageeks|frackinuniverse|granbluefantasy/.test(n)) return 'gaming';
+  if (/the_infosphere|zdoom|ibanezwiki|allthetropes|westeros/.test(n)) return 'gaming';
+  if (/minecraft|pokemon|bulba|stardew|rimworld|riskofrain|whitewolf/.test(n)) return 'gaming';
   return 'other';
 }
 
@@ -1913,7 +2229,7 @@ async function loadFullCatalog() {
 
   // Auto-categorize uncategorized items
   for (const item of items) {
-    if (!item.category) item.category = autoCategorize(item);
+    item.category = autoCategorize(item);
   }
 
   // Enrich with installed ZIM metadata by matching filename prefix to catalog name
@@ -1945,7 +2261,7 @@ function renderBrowseGallery() {
   _browseView = 'gallery';
   manageCategoryFilter = null;
   pillsBar.innerHTML = ''; pillsBar.style.display = 'none';
-  q.placeholder = 'Search Kiwix library...';
+  q.placeholder = 'Search catalog...';
 
   results.innerHTML = '<div class="loading"><span class="spinner-inline"></span>Loading library...</div>';
 
@@ -2041,16 +2357,11 @@ function drillCategory(catKey) {
     });
 
     const grouped = groupVariants(filtered);
-    // Sort: installed first, then by article_count desc
-    grouped.sort((a, b) => {
-      const aInst = (a.variants || [a]).some(v => v.installed) ? 1 : 0;
-      const bInst = (b.variants || [b]).some(v => v.installed) ? 1 : 0;
-      if (bInst !== aInst) return bInst - aInst;
-      return (b.article_count || 0) - (a.article_count || 0);
-    });
+    // Sort: installed first, then alphabetical
+    grouped.sort((a, b) => (a.title || a.name || '').localeCompare(b.title || b.name || ''));
 
     let h = '<div class="browse-drilldown-header">' +
-      '<button class="browse-back" onclick="renderBrowseGallery()">\u2190 Browse Library</button>' +
+      '<button class="browse-back" onclick="renderBrowseGallery()">\u2190 Catalog</button>' +
       '<span class="browse-drilldown-title">' + (catMeta ? catMeta.icon + ' ' : '') + esc(catName) + '</span>' +
       '<span class="browse-drilldown-count">' + grouped.length + ' available</span>' +
     '</div>';
@@ -2090,12 +2401,7 @@ function browseCatalogFilter(query) {
       return title.includes(lq) || summary.includes(lq) || (item.name || '').toLowerCase().includes(lq);
     });
     const grouped = groupVariants(filtered);
-    grouped.sort((a, b) => {
-      const aInst = (a.variants || [a]).some(v => v.installed) ? 1 : 0;
-      const bInst = (b.variants || [b]).some(v => v.installed) ? 1 : 0;
-      if (bInst !== aInst) return bInst - aInst;
-      return (b.article_count || 0) - (a.article_count || 0);
-    });
+    grouped.sort((a, b) => (a.title || a.name || '').localeCompare(b.title || b.name || ''));
     let h = '<div class="browse-drilldown-header">' +
       '<button class="browse-back" onclick="' + (manageCategoryFilter ? "drillCategory('" + escAttr(manageCategoryFilter) + "')" : 'renderBrowseGallery()') + '">\u2190 Back</button>' +
       '<span class="browse-drilldown-count">' + filtered.length + ' results for \u201C' + esc(query) + '\u201D</span>' +
@@ -2173,17 +2479,16 @@ function renderCatalogItem(group) {
   const anyInstalled = variants.some(v => v.installed);
   let actionsHtml = '';
   if (anyInstalled) {
-    // Show installed date + variant info
     const instVariant = variants.find(v => v.installed) || item;
-    let badgeText = 'Installed';
-    if (instVariant._installedDate) {
-      badgeText += ' \u00B7 ' + instVariant._installedDate;
-      // Check if catalog has a newer version
-      if (item.date && instVariant._installedDate < item.date.substring(0, 7)) {
-        badgeText += ' \u2192 ' + item.date + ' available';
-      }
+    const hasUpdate = instVariant._installedDate && item.date && instVariant._installedDate < item.date.substring(0, 7);
+    if (hasUpdate) {
+      // Update available — show update button (same style as manage view)
+      const updUrl = variants.find(v => v.download_url && !v.installed);
+      actionsHtml = '<button class="ci-update-btn" onclick="downloadZim(\'' + escAttr((updUrl || item).download_url) + '\', this, true)" title="From ' + escAttr(instVariant._installedDate) + ' \u2192 ' + escAttr(item.date) + '">' +
+        'Update</button>';
+    } else {
+      actionsHtml = '<span class="ci-installed-badge">Installed</span>';
     }
-    actionsHtml = '<span class="ci-installed-badge">' + esc(badgeText) + '</span>';
     if (instVariant._installedFile) {
       actionsHtml += '<button class="ci-delete-btn" onclick="deleteZim(\'' + escAttr(instVariant._installedFile) + '\', this)" title="Delete this ZIM file">\u00D7</button>';
     }
@@ -2227,6 +2532,9 @@ function switchManageTab(tab) {
   } else if (tab === 'collections') {
     q.placeholder = 'Search everything...';
     renderCollectionsTab();
+  } else if (tab === 'history') {
+    q.placeholder = 'Search everything...';
+    renderHistoryTab();
   } else if (tab === 'activity') {
     q.placeholder = 'Search everything...';
     renderActivityTab();
@@ -2262,8 +2570,8 @@ async function renderCollectionsTab() {
     const label = coll.label || name;
     const collZims = coll.zims || [];
     const expanded = _expandedCollection === name;
-    h += '<div class="coll-item" style="flex-direction:column;align-items:stretch">';
-    h += '<div style="display:flex;align-items:center;gap:12px;cursor:pointer" onclick="toggleCollExpand(\'' + escAttr(name) + '\')">' +
+    h += '<div class="coll-item" style="flex-direction:column;align-items:stretch" onclick="toggleCollExpand(\'' + escAttr(name) + '\')">';
+    h += '<div style="display:flex;align-items:center;gap:12px">' +
       '<span class="coll-name" style="flex:1">' + esc(label) +
       ' <span style="font-weight:400;color:var(--text2);font-size:12px">(' + collZims.length + ' source' + (collZims.length !== 1 ? 's' : '') + ')</span></span>' +
       '<button class="coll-del" onclick="event.stopPropagation();deleteCollection(\'' + escAttr(name) + '\', this)" title="Delete collection">\u00D7</button>' +
@@ -2363,6 +2671,86 @@ async function toggleCollZim(collName, zimName) {
   } catch(e) {}
 }
 
+// ── History tab ──
+function _historyZimInfo(ev) {
+  // Use cached ZIM info from event if available (survives deletion)
+  if (ev.title) return { title: ev.title, name: ev.name || '', has_icon: ev.has_icon, _fromEvent: true };
+  var filename = ev.filename;
+  // Try to find ZIM in current library by filename
+  if (zimsCache) {
+    var z = zimsCache.find(function(z) { return z.file === filename; });
+    if (z) return z;
+  }
+  // Strip date suffix to match by name prefix
+  var name = (filename || '').replace(/\.zim$/, '').replace(/_\d{4}-\d{2}$/, '');
+  if (zimsCache) {
+    var z2 = zimsCache.find(function(z) { return z.name === name; });
+    if (z2) return z2;
+  }
+  return null;
+}
+
+async function renderHistoryTab() {
+  const el = document.getElementById('manage-history');
+  if (!el) return;
+  el.innerHTML = '<div class="loading"><span class="spinner-inline"></span>Loading...</div>';
+  try {
+    const res = await manageFetch('/manage/history');
+    const data = await res.json();
+    const events = data.history || [];
+    if (!events.length) {
+      el.innerHTML = '<div class="empty"><p>No history yet</p><p class="hint">Downloads, updates, and deletions will appear here</p></div>';
+      return;
+    }
+    // Group by day
+    const days = {};
+    for (const ev of events) {
+      const d = new Date(ev.ts * 1000);
+      const key = d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+      if (!days[key]) days[key] = [];
+      days[key].push(ev);
+    }
+    let h = '';
+    for (const [day, evts] of Object.entries(days)) {
+      h += '<div style="margin-bottom:20px">';
+      h += '<div class="ci-section-label">' + esc(day) + '</div>';
+      for (const ev of evts) {
+        const time = new Date(ev.ts * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        const zim = _historyZimInfo(ev);
+        const title = zim ? (zim.title || zim.name) : (ev.filename || '').replace(/\.zim$/, '').replace(/_\d{4}-\d{2}$/, '').replace(/_/g, ' ');
+        const canShowIcon = zim && zim.has_icon && zim.name && !zim._fromEvent;
+        const iconHtml = canShowIcon
+          ? '<img src="/w/' + encodeURIComponent(zim.name) + '/-/icon" width="40" height="40" loading="lazy">'
+          : '<span class="ci-letter">' + (esc(title)[0] || '?').toUpperCase() + '</span>';
+
+        let label = '', labelColor = 'var(--text2)';
+        if (ev.event === 'updated') { label = 'Updated'; labelColor = 'var(--amber)'; }
+        else if (ev.event === 'download') { label = 'Downloaded'; labelColor = 'var(--green,#4ade80)'; }
+        else if (ev.event === 'download_failed') { label = 'Failed'; labelColor = 'var(--amber)'; }
+        else if (ev.event === 'deleted') { label = 'Deleted'; labelColor = '#ef4444'; }
+        else { label = ev.event; }
+
+        const meta = [];
+        if (ev.size_bytes) meta.push(fmtSize(ev.size_bytes / (1024 * 1024 * 1024)));
+        meta.push(time);
+
+        h += '<div class="catalog-item">' +
+          '<div class="ci-icon">' + iconHtml + '</div>' +
+          '<div class="ci-info">' +
+            '<div class="ci-title">' + esc(title) + '</div>' +
+            '<div class="ci-meta">' + meta.join(' &middot; ') + '</div>' +
+          '</div>' +
+          '<div class="ci-actions"><span style="font-size:12px;font-weight:600;color:' + labelColor + '">' + label + '</span></div>' +
+        '</div>';
+      }
+      h += '</div>';
+    }
+    el.innerHTML = h;
+  } catch(e) {
+    el.innerHTML = '<div class="empty"><p>Could not load history</p></div>';
+  }
+}
+
 // ── Stats tab (merged server stats + usage) ──
 async function renderActivityTab() {
   const el = document.getElementById('manage-activity');
@@ -2422,35 +2810,70 @@ async function renderActivityTab() {
           const title = info ? (info.title || z.name) : z.name;
           const total = (z.reads || 0) + (z.searches || 0);
           h += '<div class="mc-row"><span class="mc-label">' + esc(title) + '</span>' +
-            '<span class="mc-value">' + total + ' <span style="font-weight:400;color:var(--text2);font-size:11px">(' + (z.reads || 0) + ' reads, ' + (z.searches || 0) + ' searches)</span></span></div>';
+            '<span class="mc-value">' + total + ' <span style="font-weight:400;color:var(--text2);font-size:11px">(' + pl(z.reads || 0, 'read') + ', ' + pl(z.searches || 0, 'search', 'searches') + ')</span></span></div>';
         }
         h += '</div>';
       }
     }
 
-    // Title Index card (compact, below usage)
+    // Search index card (compact, below usage)
     if (typeof _ti !== 'undefined' && _ti) {
       const ti = _ti;
-      h += '<div class="manage-card"><h2>Title Index</h2>';
-      const stateLabel = ti.state === 'building'
-        ? '<span style="color:var(--amber)">Building' + (ti.building_now ? ' ' + esc(ti.building_now) : '') + '</span>'
-        : (ti.ready + '/' + ti.total);
-      h += '<div class="mc-row"><span class="mc-label">Indexes</span><span class="mc-value">' + stateLabel + ' &middot; ' + ti.total_size_gb + ' GB</span></div>';
+      h += '<div class="manage-card"><h2>Search Index</h2>';
+
+      // Building state
+      if (ti.state === 'building') {
+        h += '<div class="mc-row"><span class="mc-label">Building indexes</span><span class="mc-value" style="color:var(--amber)">' +
+          (ti.building_now ? esc(ti.building_now) + '&hellip;' : 'In progress&hellip;') + '</span></div>';
+      }
+
+      // Categorize indexes — use ti.total (all ZIMs) as denominator, not just indexed ones
+      const allIdx = ti.indexes || [];
+      const withFts = allIdx.filter(x => x.has_fts && x.entries > 0);
+      const noFts = allIdx.filter(x => !x.has_fts && x.entries > 0);
+      const totalZims = ti.total || 0;
+      const building = ti.state === 'building';
+
+      // Title index row
+      if (building) {
+        h += '<div class="mc-row"><span class="mc-label">Title index</span><span class="mc-value" style="color:var(--amber)">' +
+          ti.ready + ' of ' + totalZims +
+          (ti.building_now ? ' <span style="font-size:11px">(' + esc(ti.building_now) + '&hellip;)</span>' : '') +
+          '</span></div>';
+      } else if (ti.ready < totalZims) {
+        h += '<div class="mc-row"><span class="mc-label">Title index</span><span class="mc-value">' + ti.ready + ' of ' + totalZims + '</span></div>';
+      } else {
+        h += '<div class="mc-row"><span class="mc-label">Title index</span><span class="mc-value">' + pl(totalZims, 'source') + '</span></div>';
+      }
+
+      // Full-text index row — denominator is total ZIMs, not just ones with title indexes
+      const ftsTotal = building ? totalZims : totalZims;  // always use total ZIMs
+      if (withFts.length >= ftsTotal && ftsTotal > 0 && !building) {
+        h += '<div class="mc-row"><span class="mc-label">Full-text index</span><span class="mc-value">' + pl(ftsTotal, 'source') + '</span></div>';
+      } else {
+        h += '<div class="mc-row"><span class="mc-label">Full-text index</span><span class="mc-value">' + withFts.length + ' of ' + ftsTotal + '</span></div>';
+      }
+
+      // Errors
       if (ti.errors && ti.errors.length > 0) {
         for (const [name, err] of ti.errors) {
           h += '<div class="mc-row"><span class="mc-label" style="color:var(--amber)">' + esc(name) + '</span><span class="mc-value" style="font-size:11px;color:var(--text2)">' + esc(err) + '</span></div>';
         }
       }
-      // Show indexes without FTS5 — user can opt-in
-      const noFts = (ti.indexes || []).filter(x => !x.has_fts && x.entries > 0);
-      if (noFts.length > 0) {
+
+      // Sources without FTS — show build options (only when not actively building title indexes)
+      if (noFts.length > 0 && !building) {
+        h += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">';
+        h += '<div style="font-size:12px;color:var(--text2);margin-bottom:4px">Full-text finds results <em>inside</em> articles, not just titles:</div>';
         for (const idx of noFts) {
           const sizeLbl = idx.size_mb >= 1024 ? (idx.size_mb / 1024).toFixed(1) + ' GB' : Math.round(idx.size_mb) + ' MB';
-          h += '<div class="mc-row"><span class="mc-label">' + esc(idx.name) + '</span>';
-          h += '<span class="mc-value">' + sizeLbl + ' (' + idx.entries.toLocaleString() + ') ';
-          h += '<button onclick="buildFts(\'' + escAttr(idx.name) + '\', this)" style="font-size:11px;padding:2px 8px;margin-left:6px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text1)">Enable deep search</button>';
-          h += '</span></div>';
+          const estMin = Math.max(1, Math.ceil(idx.size_mb / 500));
+          const timeLbl = estMin >= 60 ? Math.round(estMin / 60) + ' hr' : '~' + estMin + ' min';
+          h += '<div class="mc-row" style="align-items:center"><span class="mc-label">' + esc(idx.name) + ' <span style="color:var(--text2);font-weight:400">(' + sizeLbl + ', ' + timeLbl + ')</span></span>';
+          h += '<button onclick="buildFts(\'' + escAttr(idx.name) + '\', this)" style="font-size:11px;padding:3px 10px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text1);white-space:nowrap">Build</button>';
+          h += '</div>';
         }
+        h += '</div>';
       }
       h += '</div>';
     }
@@ -2500,12 +2923,14 @@ async function renderManage() {
     '<div id="manage-downloads"></div>' +
     '<div class="manage-tabs">' +
       '<button class="manage-tab' + (manageTab === 'installed' ? ' active' : '') + '" data-tab="installed" onclick="switchManageTab(\'installed\')">Installed (' + installedCount + ')</button>' +
-      '<button class="manage-tab' + (manageTab === 'browse' ? ' active' : '') + '" data-tab="browse" onclick="switchManageTab(\'browse\')">Browse Library</button>' +
+      '<button class="manage-tab' + (manageTab === 'browse' ? ' active' : '') + '" data-tab="browse" onclick="switchManageTab(\'browse\')">Catalog</button>' +
       '<button class="manage-tab' + (manageTab === 'collections' ? ' active' : '') + '" data-tab="collections" onclick="switchManageTab(\'collections\')">Collections</button>' +
+      '<button class="manage-tab' + (manageTab === 'history' ? ' active' : '') + '" data-tab="history" onclick="switchManageTab(\'history\')">History</button>' +
       '<button class="manage-tab' + (manageTab === 'activity' ? ' active' : '') + '" data-tab="activity" onclick="switchManageTab(\'activity\')">Stats</button>' +
     '</div>' +
     '<div id="manage-installed" class="manage-tab-content' + (manageTab === 'installed' ? ' active' : '') + '"></div>' +
     '<div id="manage-collections" class="manage-tab-content' + (manageTab === 'collections' ? ' active' : '') + '"></div>' +
+    '<div id="manage-history" class="manage-tab-content' + (manageTab === 'history' ? ' active' : '') + '"></div>' +
     '<div id="manage-activity" class="manage-tab-content' + (manageTab === 'activity' ? ' active' : '') + '"></div>' +
     '<div id="manage-browse" class="manage-tab-content' + (manageTab === 'browse' ? ' active' : '') + '">' +
       '<div class="manage-search" style="justify-content:flex-end">' +
@@ -2533,7 +2958,9 @@ async function renderManage() {
           '</span>' +
         '</div>' +
         '<div style="margin-top:12px;display:flex;gap:8px;align-items:center">' +
-          '<button class="manage-btn-action" onclick="refreshLibrary()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">Refresh Cache</button>' +
+          (IS_DESKTOP
+            ? '<button class="manage-btn-action" onclick="openSettings()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">&#x2699;&#xFE0F; Settings</button>'
+            : '<button id="refresh-cache-btn" class="manage-btn-action" onclick="settingsRefreshCache()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">&#x1F504; Refresh Cache</button>') +
           '<button id="pw-btn" class="manage-btn-action" onclick="managePassword()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">&#x1F512; Password</button>' +
           (sessionStorage.getItem('zimi_manage_pw') ? '<button class="manage-btn-action" onclick="manageLogout()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)" title="Log out and return to home">Log Out</button>' : '') +
           '<span style="flex:1"></span>' +
@@ -2553,6 +2980,8 @@ async function renderManage() {
     renderInstalled();
   } else if (manageTab === 'collections') {
     renderCollectionsTab();
+  } else if (manageTab === 'history') {
+    renderHistoryTab();
   } else if (manageTab === 'activity') {
     renderActivityTab();
   } else {
@@ -2588,7 +3017,7 @@ function getInstalledPillsHtml() {
   const zims = zimsCache || [];
   const cats = new Set();
   for (const z of zims) cats.add(z.category || categorizeZim(z.name));
-  const sorted = MANAGE_CATEGORIES.filter(c => cats.has(c));
+  const sorted = [...cats].sort();
   if (sorted.length <= 1) return '';
   let h = '<div class="pills" style="margin-bottom:12px"><button class="pill' + (!manageCategoryFilter ? ' active' : '') + '" onclick="filterManageCategory(null)">All</button>';
   for (const cat of sorted) {
@@ -2608,7 +3037,7 @@ function renderInstalled(filterText) {
   if (!el) return;
   const zims = zimsCache || [];
   if (!zims.length) {
-    el.innerHTML = '<div class="empty"><p>No ZIMs installed</p><div class="hint">Switch to Browse Library to add some</div></div>';
+    el.innerHTML = '<div class="empty"><p>No ZIMs installed</p><div class="hint">Switch to Catalog to add some</div></div>';
     return;
   }
 
@@ -2637,7 +3066,7 @@ function renderInstalled(filterText) {
     }
   }
 
-  const catOrder = MANAGE_CATEGORIES;
+  const catOrder = Object.keys(groups).sort();
   let items_h = '';
   for (const cat of catOrder) {
     const items = groups[cat];
@@ -2672,8 +3101,8 @@ function renderInstalled(filterText) {
       const upd = _availableUpdates[z.file];
       let actionsHtml = '';
       if (upd) {
-        actionsHtml = '<button class="ci-update-btn" onclick="downloadZim(\'' + escAttr(upd.download_url) + '\', this)">' +
-          'Update \u2192 ' + esc(upd.latest_date) + '</button>' +
+        actionsHtml = '<button class="ci-update-btn" onclick="downloadZim(\'' + escAttr(upd.download_url) + '\', this, true)" title="From ' + escAttr(dateStr || '?') + ' \u2192 ' + escAttr(upd.latest_date) + '">' +
+          'Update</button>' +
           '<button class="ci-delete-btn" onclick="deleteZim(\'' + escAttr(z.file) + '\', this)" title="Delete">\u00D7</button>';
       } else {
         actionsHtml = '<span class="ci-installed-badge">Installed</span>' +
@@ -2796,7 +3225,7 @@ async function searchCatalog(append) {
     let h = '';
     if (!append) {
       h += '<div class="browse-drilldown-header">' +
-        '<button class="browse-back" onclick="renderBrowseGallery();q.value=\'\'">\u2190 Browse Library</button>' +
+        '<button class="browse-back" onclick="renderBrowseGallery();q.value=\'\'">\u2190 Catalog</button>' +
         '<span class="browse-drilldown-count">' + esc(String(data.total)) + ' results</span></div>';
     }
     for (const item of grouped) h += renderCatalogItem(item);
@@ -2832,7 +3261,7 @@ async function searchCatalog(append) {
   }
 }
 
-async function downloadZim(url, btn) {
+async function downloadZim(url, btn, isUpdate) {
   if (btn) { btn.disabled = true; btn.textContent = 'Starting...'; }
   try {
     const res = await manageFetch('/manage/download', {
@@ -2844,7 +3273,7 @@ async function downloadZim(url, btn) {
     if (data.error) { if (btn) { btn.textContent = 'Error'; btn.disabled = false; } return; }
     if (btn) {
       btn.dataset.dlUrl = url;
-      btn.textContent = 'Queued...';
+      btn.textContent = isUpdate ? 'Updating...' : 'Downloading...';
       btn.classList.add('ci-installed-badge');
       // Hide sibling variant buttons (only show the one being downloaded)
       const variantsDiv = btn.closest('.ci-variants');
@@ -2875,14 +3304,21 @@ async function deleteZim(filename, btn) {
   btn.textContent = 'Deleting...';
   btn.disabled = true;
   const card = btn.closest('.catalog-item');
+  // Optimistic: hide card immediately
+  if (card) card.style.display = 'none';
+  zimsCache = (zimsCache || []).filter(function(z) { return z.file !== filename; });
   try {
     const res = await manageFetch('/manage/delete', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({filename})
     });
     const data = await res.json();
-    if (data.error) { btn.textContent = 'Error: ' + data.error; return; }
-    // Remove card immediately
+    if (data.error) {
+      // Restore card on error
+      if (card) card.style.display = '';
+      btn.textContent = 'Error: ' + data.error;
+      return;
+    }
     if (card) card.remove();
     _catalogCache = null;
     const lr = await fetch('/list');
@@ -3012,7 +3448,7 @@ async function refreshDownloads() {
           if (dl.done) { btn.textContent = 'Installed'; }
           else if (dl.error) { btn.textContent = 'Error'; btn.disabled = false; }
           else if (dl.percent > 0) { btn.textContent = Math.round(dl.percent) + '%'; }
-          else { btn.textContent = 'Queued...'; }
+          else { btn.textContent = dl.is_update ? 'Updating...' : 'Downloading...'; }
         }
       }
     }
@@ -3189,10 +3625,17 @@ async function manageClearPassword() {
 
 // ── Reader ──
 function openReader(url) {
-  // PDFs can't render inside sandboxed iframes — open in new tab
-  if (url.toLowerCase().endsWith('.pdf')) {
-    window.open(url, '_blank');
-    return;
+  // PDFs and EPUBs can't render inside sandboxed iframes — open externally
+  var lurl = url.toLowerCase();
+  if (lurl.endsWith('.pdf') || lurl.endsWith('.epub')) {
+    var extUrl = url + (url.includes('?') ? '&' : '?') + 'raw=1';
+    if (!/^https?:\/\//.test(extUrl)) extUrl = location.origin + extUrl;
+    if (IS_DESKTOP && window.pywebview && window.pywebview.api && window.pywebview.api.open_external) {
+      window.pywebview.api.open_external(extUrl);
+    } else {
+      window.open(extUrl, '_blank');
+    }
+    return false; // opened externally, not in reader
   }
   readerOpen = true;
   const reader = document.getElementById('reader');
@@ -3207,6 +3650,45 @@ function openReader(url) {
 
   frame.onload = function() {
     loading.classList.add('hidden');
+    if (!readerOpen) return; // reader was closed — don't update title
+    // Intercept clicks on PDF/EPUB links inside the iframe — open externally
+    try {
+      frame.contentDocument.addEventListener('click', function(e) {
+        var a = e.target.closest('a[href]');
+        if (!a) return;
+        var href = a.getAttribute('href') || '';
+        var lhref = href.toLowerCase();
+        if (lhref.endsWith('.epub') || lhref.endsWith('.pdf')) {
+          e.preventDefault();
+          var fullUrl = a.href; // resolved absolute URL
+          if (!fullUrl.includes('raw=1')) fullUrl += (fullUrl.includes('?') ? '&' : '?') + 'raw=1';
+          if (lhref.endsWith('.epub')) {
+            var dl = document.createElement('a');
+            dl.href = fullUrl; dl.download = ''; dl.style.display = 'none';
+            document.body.appendChild(dl); dl.click(); document.body.removeChild(dl);
+          } else if (IS_DESKTOP && window.pywebview && window.pywebview.api && window.pywebview.api.open_external) {
+            window.pywebview.api.open_external(fullUrl);
+          } else {
+            window.open(fullUrl, '_blank');
+          }
+        }
+      });
+    } catch(e) { /* cross-origin */ }
+    // Update document/window title from iframe content
+    try {
+      var iTitle = frame.contentDocument && frame.contentDocument.title;
+      if (!iTitle) {
+        // Fallback: extract from iframe URL path
+        var iPath = frame.contentWindow.location.pathname;
+        var seg = decodeURIComponent(iPath.split('/').pop() || '').replace(/_/g, ' ');
+        if (seg && seg !== 'blank') iTitle = seg;
+      }
+      if (iTitle) {
+        var t = iTitle + ' \u2014 Zimi';
+        document.title = t;
+        _setWindowTitle(t);
+      }
+    } catch(e) { /* cross-origin or closed */ }
   };
   frame.src = url;
   updateTopbar();
@@ -3214,11 +3696,34 @@ function openReader(url) {
 
 function openArticle(zim, path) {
   const url = '/w/' + encodeURIComponent(zim) + '/' + path.split('/').map(encodeURIComponent).join('/');
-  // Track which ZIM the reader is showing (for topbar badge)
   readerSource = zim;
-  // Push history so browser back closes the reader
+  // PDF/EPUB: open externally without pushing reader history state
+  var lurl = url.toLowerCase();
+  if (lurl.endsWith('.pdf') || lurl.endsWith('.epub')) {
+    var extUrl = url + '?raw=1';
+    if (!/^https?:\/\//.test(extUrl)) extUrl = location.origin + extUrl;
+    if (lurl.endsWith('.epub')) {
+      // Use invisible <a download> for reliable EPUB download (popups get blocked)
+      var a = document.createElement('a');
+      a.href = extUrl; a.download = ''; a.style.display = 'none';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    } else if (IS_DESKTOP && window.pywebview && window.pywebview.api && window.pywebview.api.open_external) {
+      window.pywebview.api.open_external(extUrl);
+    } else {
+      window.open(extUrl, '_blank');
+    }
+    // Don't change title — main window still shows the ZIM source page
+    return;
+  }
+  // Normal article: push state and open in reader
   history.pushState({ mode: 'reader', zim: zim, path: path }, '', url);
   openReader(url);
+  var readerTitle = decodeURIComponent(path.split('/').pop() || '').replace(/_/g, ' ');
+  if (readerTitle) {
+    var t2 = readerTitle + ' — Zimi';
+    document.title = t2;
+    _setWindowTitle(t2);
+  }
 }
 
 function closeReader() {
@@ -3229,6 +3734,7 @@ function closeReader() {
   document.getElementById('reader-frame').src = 'about:blank';
   mainView.classList.remove('hidden');
   updateTopbar();
+  _setWindowTitle('Zimi');
 }
 
 // ── Random ──
@@ -3242,8 +3748,20 @@ async function randomArticle(event) {
   try {
     const res = await fetch('/random' + zimParam);
     const data = await res.json();
-    if (data.error) return;
-    openArticle(data.zim, data.path);
+    if (!data.error) { openArticle(data.zim, data.path); return; }
+    // Fallback for zimgit/PDF ZIMs: pick random doc from catalog
+    if (currentSource) {
+      const catRes = await fetch('/catalog?zim=' + encodeURIComponent(currentSource));
+      const catData = await catRes.json();
+      if (catData.documents && catData.documents.length) {
+        const docs = catData.documents.filter(d => d.path);
+        if (docs.length) {
+          const pick = docs[Math.floor(Math.random() * docs.length)];
+          openArticle(currentSource, pick.path);
+          return;
+        }
+      }
+    }
   } catch(e) {}
 }
 
@@ -3266,17 +3784,274 @@ document.addEventListener('keydown', e => {
 window.addEventListener('popstate', (e) => {
   hideSuggest();
   if (readerOpen) closeReader();
-  // Always re-route based on the URL the browser navigated to
   q.value = '';
   activeCategories.clear();
   activeSourceFilters.clear();
   sourceAutoReader = false;
-  route(false);
+  // Route based on state, not URL (avoids re-opening reader on back)
+  var s = e.state;
+  if (s && s.mode === 'home' && s.scope) {
+    enterScope(s.scope.type, s.scope.label, s.scope.zimNames, false);
+  } else if (s && s.mode === 'home') {
+    enterHome(false);
+  } else if (s && s.mode === 'search' && s.query) {
+    // Going back to search results — restore cached results instantly if available
+    if (s.source) {
+      _popstateNoAutoReader = true;
+      enterSource(s.source, false);
+      _popstateNoAutoReader = false;
+    } else {
+      mode = 'search'; currentSource = null; sourceAutoReader = false;
+      sourceHeaderEl.style.display = 'none';
+      mainView.classList.remove('hidden');
+    }
+    q.value = s.query;
+    if (allResults && allResults._query === s.query && (allResults.results || []).length > 0) {
+      // Instant restore from in-memory cache
+      renderSearchResults(allResults, currentSource);
+      updateTopbar();
+    } else {
+      doSearch(s.query, false);
+    }
+  } else if (s && s.mode === 'reader' && s.zim) {
+    // Going back to a reader state — show the source page, don't re-open reader
+    _popstateNoAutoReader = true;
+    enterSource(s.zim, false);
+    _popstateNoAutoReader = false;
+  } else if (s && s.mode === 'source' && s.source) {
+    // Going back to source — show source page, don't auto-open reader
+    _popstateNoAutoReader = true;
+    enterSource(s.source, false);
+    _popstateNoAutoReader = false;
+  } else {
+    // Fallback: route from URL
+    route(false);
+  }
 });
 
 // ── Util ──
 function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 function escAttr(s) { return esc(s).replace(/'/g, '&#39;').replace(/"/g, '&quot;'); }
+// Escape for JS string literal inside HTML onclick attribute (survives HTML decode then JS parse)
+function escJs(s) { return (s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+
+// ── Desktop app integration (pywebview) ──
+// pywebview injects window.pywebview AFTER page load, so we can't check at parse time.
+// Instead, listen for the 'pywebviewready' event and set IS_DESKTOP then.
+let IS_DESKTOP = false;
+
+function _desktopInit() {
+  IS_DESKTOP = true;
+  console.log('[Zimi] Desktop mode enabled, pywebview bridge ready');
+  // Check onboarding if init already ran (zimsCache populated)
+  if (zimsCache !== null) _desktopCheckOnboarding();
+}
+
+function _setWindowTitle(title) {
+  document.title = title;
+  // pywebview bridge: try direct call, with fallback polling
+  if (window.pywebview && window.pywebview.api && window.pywebview.api.set_title) {
+    window.pywebview.api.set_title(title).catch(function(e) {
+      console.warn('[Zimi] set_title failed:', e);
+    });
+  }
+}
+
+// Detect pywebview even if the 'pywebviewready' event was missed
+// (can happen when load_url navigates to server after initial HTML load)
+(function _detectDesktop() {
+  if (window.pywebview && window.pywebview.api) {
+    if (!IS_DESKTOP) _desktopInit();
+    return;
+  }
+  // Poll for up to 10 seconds after page load
+  let attempts = 0;
+  const timer = setInterval(function() {
+    if (window.pywebview && window.pywebview.api) {
+      clearInterval(timer);
+      if (!IS_DESKTOP) _desktopInit();
+    } else if (++attempts > 50) {
+      clearInterval(timer); // give up after 10s
+    }
+  }, 200);
+})();
+
+async function _desktopCheckOnboarding() {
+  if (!IS_DESKTOP) return;
+  // Only show onboarding if desktop + no ZIMs + first run
+  if (zimsCache && zimsCache.length === 0) {
+    try {
+      const cfg = await pywebview.api.get_config();
+      if (cfg.is_first_run) {
+        const el = document.getElementById('onboard-path');
+        if (el) el.value = cfg.zim_dir || '';
+        document.getElementById('onboard-start').disabled = !cfg.zim_dir;
+        document.getElementById('desktop-onboarding').classList.add('open');
+      }
+    } catch(e) {}
+  }
+}
+
+async function desktopChooseFolder(inputId) {
+  if (!IS_DESKTOP) return;
+  const input = document.getElementById(inputId);
+  try {
+    const folder = await pywebview.api.choose_folder(input.value || null);
+    if (folder) {
+      input.value = folder;
+      // Enable the Get Started button if this is onboarding
+      if (inputId === 'onboard-path') {
+        document.getElementById('onboard-start').disabled = false;
+      }
+    }
+  } catch(e) {}
+}
+
+async function desktopFinishOnboarding() {
+  if (!IS_DESKTOP) return;
+  const path = document.getElementById('onboard-path').value;
+  if (!path) return;
+  try {
+    const needsRestart = await pywebview.api.save_config({ zim_dir: path });
+    document.getElementById('desktop-onboarding').classList.remove('open');
+    if (needsRestart) {
+      await pywebview.api.restart();
+    }
+  } catch(e) {}
+}
+
+// pywebview fires this event once the JS bridge is ready
+window.addEventListener('pywebviewready', function() { _desktopInit(); });
+
+// ── Server Settings overlay ──
+let _settingsOriginal = {};
+
+async function openSettings() {
+  const overlay = document.getElementById('settings-overlay');
+  const dirInput = document.getElementById('settings-dir');
+  const portInput = document.getElementById('settings-port');
+  const browseBtn = document.getElementById('settings-browse-btn');
+  const msgEl = document.getElementById('settings-restart-msg');
+  msgEl.className = 'settings-restart-msg';
+  msgEl.textContent = '';
+
+  if (IS_DESKTOP) {
+    // Desktop mode: get config from pywebview bridge
+    browseBtn.style.display = '';
+    portInput.readOnly = false;
+    document.getElementById('settings-save-btn').style.display = '';
+    document.getElementById('settings-port-label').style.display = '';
+    document.getElementById('settings-port-row').style.display = '';
+    document.getElementById('settings-hint').style.display = '';
+    try {
+      const cfg = await pywebview.api.get_config();
+      dirInput.value = cfg.zim_dir || '';
+      portInput.value = cfg.port || 8899;
+      _settingsOriginal = { zim_dir: cfg.zim_dir, port: cfg.port };
+    } catch(e) {}
+  } else {
+    // Server mode: show read-only info + useful actions
+    browseBtn.style.display = 'none';
+    dirInput.readOnly = true;
+    document.getElementById('settings-save-btn').style.display = 'none';
+    document.getElementById('settings-port-label').style.display = 'none';
+    document.getElementById('settings-port-row').style.display = 'none';
+    document.getElementById('settings-hint').textContent = 'Settings are configured via environment variables or Docker.';
+    try {
+      const r = await manageFetch('/manage/stats');
+      if (r.ok) {
+        const s = await r.json();
+        if (s.disk && s.disk.zim_dir) dirInput.value = s.disk.zim_dir;
+      }
+    } catch(e) {}
+    _settingsOriginal = {};
+  }
+
+  // Show "Open in browser" link
+  const browserLink = document.getElementById('settings-browser-link');
+  const browserUrl = document.getElementById('settings-browser-url');
+  const browserLabel = document.getElementById('settings-browser-label');
+  if (IS_DESKTOP) {
+    const url = 'http://localhost:' + (portInput.value || 8899);
+    browserUrl.href = url;
+    browserUrl.textContent = url;
+    browserLabel.textContent = 'Access from any browser on this computer';
+    browserLink.style.display = '';
+  } else {
+    browserLink.style.display = 'none';  // Not useful in browser mode
+  }
+
+  overlay.classList.add('open');
+}
+
+function closeSettings() {
+  document.getElementById('settings-overlay').classList.remove('open');
+}
+
+async function settingsChooseFolder() {
+  if (!IS_DESKTOP) return;
+  const input = document.getElementById('settings-dir');
+  try {
+    const folder = await pywebview.api.choose_folder(input.value || null);
+    if (folder) input.value = folder;
+  } catch(e) {}
+}
+
+async function settingsSave() {
+  const dirInput = document.getElementById('settings-dir');
+  const portInput = document.getElementById('settings-port');
+  const msgEl = document.getElementById('settings-restart-msg');
+  const port = parseInt(portInput.value, 10);
+
+  if (IS_DESKTOP) {
+    const updates = {};
+    if (dirInput.value !== _settingsOriginal.zim_dir) updates.zim_dir = dirInput.value;
+    if (port !== _settingsOriginal.port) updates.port = port;
+    if (Object.keys(updates).length === 0) { closeSettings(); return; }
+    try {
+      const needsRestart = await pywebview.api.save_config(updates);
+      if (needsRestart) {
+        msgEl.textContent = 'Restarting with new settings\u2026';
+        msgEl.className = 'settings-restart-msg show';
+        setTimeout(() => pywebview.api.restart(), 500);
+        return;
+      }
+    } catch(e) {}
+  }
+  closeSettings();
+}
+
+let _refreshing = false;
+async function settingsRefreshCache() {
+  if (_refreshing) return;
+  _refreshing = true;
+  // Works both from settings overlay and standalone (manage view button)
+  const msgEl = document.getElementById('settings-restart-msg');
+  const btn = document.getElementById('refresh-cache-btn');
+  const zimRow = document.querySelector('#manage-status .mc-value');
+  if (btn) { btn.disabled = true; btn.textContent = '\u23F3 Refreshing\u2026'; }
+  if (msgEl) {
+    msgEl.textContent = 'Refreshing cache\u2026';
+    msgEl.className = 'settings-restart-msg show';
+  }
+  try {
+    await manageFetch('/manage/refresh', { method: 'POST' });
+    if (msgEl) msgEl.textContent = 'Cache refreshed.';
+    // Reload ZIM list
+    try { const lr = await fetch('/list'); zimsCache = await lr.json(); } catch(e) {}
+    if (btn) btn.textContent = '\u2705 Refreshed';
+    if (msgEl && document.getElementById('settings-overlay').classList.contains('open')) {
+      setTimeout(() => { closeSettings(); renderManage(); }, 800);
+    } else {
+      renderManage();
+    }
+  } catch(e) {
+    if (msgEl) msgEl.textContent = 'Failed to refresh cache.';
+    if (btn) btn.textContent = '\u274C Failed';
+  } finally {
+    setTimeout(() => { _refreshing = false; }, 2000);
+  }
+}
 
 init();
 </script>

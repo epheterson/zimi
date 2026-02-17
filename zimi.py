@@ -34,6 +34,7 @@ Usage (HTTP API):
 
 import argparse
 import ast
+import base64
 import gzip
 import glob
 import hashlib
@@ -66,7 +67,7 @@ try:
 except ImportError:
     HAS_PYMUPDF = False
 
-ZIMI_VERSION = "1.2.0"
+ZIMI_VERSION = "1.3.0"
 
 log = logging.getLogger("zimi")
 logging.basicConfig(format="%(asctime)s %(message)s", datefmt="%H:%M:%S", level=logging.INFO)
@@ -248,6 +249,7 @@ def _get_disk_usage():
         zim_size = sum(os.path.getsize(os.path.join(ZIM_DIR, f))
                        for f in os.listdir(ZIM_DIR) if f.endswith(".zim"))
         return {
+            "zim_dir": ZIM_DIR,
             "disk_total_gb": round(total / (1024**3), 1),
             "disk_free_gb": round(free / (1024**3), 1),
             "disk_used_gb": round(used / (1024**3), 1),
@@ -416,6 +418,47 @@ def _categorize_zim(name):
     if n in ("gutenberg", "rationalwiki", "theworldfactbook"):
         return "Books"
     return None
+
+
+# ── History Log ──
+# Persistent event log for downloads, deletions, etc. Stored in ZIMI_DATA_DIR/history.json.
+
+_history_lock = threading.Lock()
+_HISTORY_MAX = 500
+
+
+def _history_file_path():
+    return os.path.join(ZIMI_DATA_DIR, "history.json")
+
+
+def _load_history():
+    """Load event history from disk. Returns list of event dicts, newest first."""
+    try:
+        with open(_history_file_path()) as f:
+            data = json.load(f)
+        if isinstance(data, list):
+            return data
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+    return []
+
+
+def _append_history(event):
+    """Append an event dict to persistent history. Thread-safe."""
+    with _history_lock:
+        entries = _load_history()
+        entries.insert(0, event)
+        if len(entries) > _HISTORY_MAX:
+            entries = entries[:_HISTORY_MAX]
+        path = _history_file_path()
+        tmp = path + ".tmp"
+        try:
+            with open(tmp, "w") as f:
+                json.dump(entries, f, ensure_ascii=False)
+            os.replace(tmp, path)
+        except OSError as e:
+            log.warning("Failed to write history: %s", e)
+
 
 # ── Collections & Favorites ──
 # Stored in .zimi_collections.json alongside ZIM files (persists across container rebuilds).
@@ -755,7 +798,7 @@ def _get_title_index_stats():
     # Use live counts: ready = indexes on disk, total = ZIM files
     status["ready"] = len(indexes)
     status["total"] = len(get_zim_files())
-    status["indexes"] = sorted(indexes, key=lambda x: -x["size_mb"])[:10]  # top 10 by size
+    status["indexes"] = sorted(indexes, key=lambda x: -x["size_mb"])
     return status
 
 def _build_all_title_indexes():
@@ -1872,6 +1915,18 @@ def _download_thread(dl):
         _suggest_cache_clear()
         _clean_stale_title_indexes()
         dl["done"] = True
+        # Cache ZIM metadata in history so entries survive deletion
+        zim_info = {}
+        try:
+            for z in (_zim_list_cache or []):
+                if z.get("file") == dl["filename"]:
+                    zim_info = {"title": z.get("title", ""), "name": z.get("name", ""), "has_icon": z.get("has_icon", False)}
+                    break
+        except Exception:
+            pass
+        event_type = "updated" if dl.get("is_update") else "download"
+        _append_history({"event": event_type, "ts": time.time(), "filename": dl["filename"],
+                         "size_bytes": dl.get("total_bytes", 0), **zim_info})
     except Exception as e:
         # Keep .tmp for resume on transient network errors; delete on validation failures
         is_transient = isinstance(e, (urllib.error.URLError, TimeoutError, ConnectionError, OSError))
@@ -1882,6 +1937,9 @@ def _download_thread(dl):
                 pass
         dl["done"] = True
         dl["error"] = str(e)
+        if not dl.get("cancelled"):
+            _append_history({"event": "download_failed", "ts": time.time(), "filename": dl["filename"],
+                             "error": str(e)})
 
 
 def _start_download(url):
@@ -1907,6 +1965,13 @@ def _start_download(url):
         return None, "Invalid characters in filename"
     dest = os.path.join(ZIM_DIR, filename)
 
+    # Detect if this replaces an existing ZIM (update vs fresh download)
+    name_prefix = re.sub(r'_\d{4}-\d{2}\.zim$', '', filename)
+    is_update = any(
+        f != filename and f.endswith('.zim') and re.sub(r'_\d{4}-\d{2}\.zim$', '', f) == name_prefix
+        for f in os.listdir(ZIM_DIR) if os.path.isfile(os.path.join(ZIM_DIR, f))
+    ) if os.path.isdir(ZIM_DIR) else False
+
     with _download_lock:
         _download_counter += 1
         dl_id = str(_download_counter)
@@ -1918,6 +1983,7 @@ def _start_download(url):
             "started": time.time(),
             "done": False,
             "error": None,
+            "is_update": is_update,
         }
         _active_downloads[dl_id] = dl
         t = threading.Thread(target=_download_thread, args=(dl,), daemon=True)
@@ -1953,6 +2019,7 @@ def _get_downloads():
                 "done": done,
                 "error": error,
                 "elapsed": round(time.time() - dl["started"], 1),
+                "is_update": dl.get("is_update", False),
             })
             # Clean up completed downloads older than 1 hour
             if done and (time.time() - dl["started"]) > 3600:
@@ -2228,8 +2295,17 @@ class ZimHandler(BaseHTTPRequestHandler):
                 elif parsed.path == "/manage/downloads":
                     return self._json(200, {"downloads": _get_downloads()})
 
+                elif parsed.path == "/manage/history":
+                    return self._json(200, {"history": _load_history()})
+
                 else:
                     return self._json(404, {"error": "not found"})
+
+            elif parsed.path in ("/favicon.ico", "/favicon.png"):
+                return self._serve_favicon()
+
+            elif parsed.path == "/apple-touch-icon.png":
+                return self._serve_apple_touch_icon()
 
             elif parsed.path == "/":
                 return self._serve_index()
@@ -2245,9 +2321,10 @@ class ZimHandler(BaseHTTPRequestHandler):
                     entry_path = unquote(rest[slash + 1:])
                 # Top-level browser navigation (reload/bookmark) → serve SPA shell
                 # so client-side router can handle the deep link.
-                # Iframe/fetch requests get raw ZIM content as before.
+                # ?raw=1 bypasses SPA shell (used for PDF new-tab opening to avoid loops).
                 fetch_dest = self.headers.get("Sec-Fetch-Dest", "")
-                if fetch_dest == "document" or not entry_path:
+                is_raw = "raw" in parse_qs(parsed.query)
+                if (fetch_dest == "document" or not entry_path) and not is_raw and not any(entry_path.lower().endswith(ext) for ext in (".pdf", ".epub")):
                     return self._serve_index()
                 # Track iframe article loads
                 if fetch_dest == "iframe":
@@ -2396,8 +2473,24 @@ class ZimHandler(BaseHTTPRequestHandler):
                 if not os.path.exists(filepath):
                     return self._json(404, {"error": f"File not found: {filename}"})
                 try:
+                    file_size = 0
+                    try:
+                        file_size = os.path.getsize(filepath)
+                    except OSError:
+                        pass
+                    # Cache ZIM info before deletion so history shows proper title/icon
+                    zim_info = {}
+                    try:
+                        for z in (_zim_list_cache or []):
+                            if z.get("file") == filename:
+                                zim_info = {"title": z.get("title", ""), "name": z.get("name", ""), "has_icon": z.get("has_icon", False)}
+                                break
+                    except Exception:
+                        pass
                     os.remove(filepath)
                     log.info(f"Deleted ZIM: {filename}")
+                    _append_history({"event": "deleted", "ts": time.time(), "filename": filename,
+                                     "size_bytes": file_size, **zim_info})
                     with _zim_lock:
                         load_cache(force=True)
                     _search_cache_clear()
@@ -2530,6 +2623,20 @@ class ZimHandler(BaseHTTPRequestHandler):
             # Fix zimgit packaging bug: PDFs stored with text/html mimetype
             if entry_path.lower().endswith(".pdf") and mimetype != "application/pdf":
                 mimetype = "application/pdf"
+            # Force EPUB download (browsers can't render EPUB inline)
+            is_epub = entry_path.lower().endswith(".epub") or mimetype in ("application/epub+zip", "application/epub")
+            if is_epub:
+                mimetype = "application/epub+zip"
+                epub_filename = os.path.basename(entry_path)
+                if not epub_filename.endswith(".epub"):
+                    epub_filename += ".epub"
+                self.send_response(200)
+                self.send_header("Content-Type", mimetype)
+                self.send_header("Content-Length", str(total_size))
+                self.send_header("Content-Disposition", f'attachment; filename="{epub_filename}"')
+                self.end_headers()
+                self.wfile.write(bytes(item.content))
+                return
 
             # Streamable types support Range requests (no size limit)
             is_streamable = any(mimetype.startswith(t) for t in ("video/", "audio/", "application/ogg"))
@@ -2625,6 +2732,58 @@ class ZimHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body_bytes)))
         self.end_headers()
         self.wfile.write(body_bytes)
+
+    _favicon_data = None
+
+    def _serve_favicon(self):
+        if ZimHandler._favicon_data is None:
+            # Try loading full-size icon from assets directory
+            icon_paths = [
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon.png"),
+                os.path.join(getattr(sys, '_MEIPASS', ''), "assets", "icon.png") if getattr(sys, '_MEIPASS', None) else "",
+            ]
+            for p in icon_paths:
+                if p and os.path.exists(p):
+                    with open(p, "rb") as f:
+                        ZimHandler._favicon_data = f.read()
+                    break
+            if not ZimHandler._favicon_data:
+                # Fallback: extract from HTML template's base64 data URI
+                import re as _re
+                m = _re.search(r'data:image/png;base64,([A-Za-z0-9+/=]+)', SEARCH_UI_HTML)
+                ZimHandler._favicon_data = base64.b64decode(m.group(1)) if m else b''
+        if not ZimHandler._favicon_data:
+            self.send_response(404)
+            self.end_headers()
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "image/png")
+        self.send_header("Content-Length", str(len(ZimHandler._favicon_data)))
+        self.send_header("Cache-Control", "public, max-age=86400")
+        self.end_headers()
+        self.wfile.write(ZimHandler._favicon_data)
+
+    _apple_touch_icon_data = None
+
+    def _serve_apple_touch_icon(self):
+        if ZimHandler._apple_touch_icon_data is None:
+            icon_paths = [
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "apple-touch-icon.png"),
+                os.path.join(getattr(sys, '_MEIPASS', ''), "assets", "apple-touch-icon.png") if getattr(sys, '_MEIPASS', None) else "",
+            ]
+            for p in icon_paths:
+                if p and os.path.exists(p):
+                    with open(p, "rb") as f:
+                        ZimHandler._apple_touch_icon_data = f.read()
+                    break
+            if not ZimHandler._apple_touch_icon_data:
+                return self._serve_favicon()  # fallback to regular favicon
+        self.send_response(200)
+        self.send_header("Content-Type", "image/png")
+        self.send_header("Content-Length", str(len(ZimHandler._apple_touch_icon_data)))
+        self.send_header("Cache-Control", "public, max-age=86400")
+        self.end_headers()
+        self.wfile.write(ZimHandler._apple_touch_icon_data)
 
     def _serve_index(self):
         return self._html(200, SEARCH_UI_HTML)

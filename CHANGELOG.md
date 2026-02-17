@@ -1,5 +1,36 @@
 # Changelog
 
+## v1.3.0 — Browse Library + Desktop App
+
+### Browse Library
+- **Category gallery** — visual browse page with 9 curated categories (Encyclopedias, Q&A, Dev Docs, Video, Education, Books, Medical, Survival, Gaming) + Other. Auto-categorizes 1,000+ ZIM catalog items using OPDS metadata with name-based fallback.
+- **Category drilldown** — click a category to see all items with size, language, and install status.
+- **Available updates** — update badges on installed ZIMs in browse and manage views. One-click update from context menu.
+
+### Desktop App
+- **Native window** — pywebview embeds the web UI in a proper app window (WebKit on macOS, Edge WebView2 on Windows).
+- **Onboarding** — first-run overlay with native folder picker for ZIM storage location.
+- **Settings modal** — change ZIM directory, port, and other options from the gear icon.
+- **Cross-platform builds** — PyInstaller spec for macOS (.app/.dmg), Windows (.exe), and Linux. GitHub Actions workflow for automated release builds.
+
+### Web UI
+- **Context menu** — right-click ZIM cards for quick actions (open, search within, copy link, check for updates, delete).
+- **EPUB downloads** — clicking an EPUB article now downloads the file directly instead of trying to render it.
+- **PDF external open** — PDFs open in a new browser tab while preserving the source ZIM context.
+- **Browser history** — proper pushState/popstate navigation for search, reader, and source views. Back button returns to previous view.
+- **iOS home screen icon** — 180×180 RGB PNG for proper rendering as a web app icon.
+- **Icon styling** — consistent padding and border-radius on ZIM icons throughout the UI.
+- **Scroll containment** — prevents iOS Safari elastic bounce from interfering with the app.
+
+### Server
+- **History log** — persistent event log for downloads, updates, and deletions. Stored in `ZIMI_DATA_DIR/history.json`.
+- **Apple touch icon** — `/apple-touch-icon.png` endpoint for iOS web app support.
+- **ZIM directory in status** — `/manage/status` now includes `zim_dir` path.
+
+### Bug Fixes
+- Fixed article paths containing apostrophes or ampersands breaking onclick handlers (double-parse escaping bug).
+- Fixed title index stats truncating to top 10 — now shows all indexes.
+
 ## v1.2.0 — Progressive Search + SQLite Title Index
 
 ### Search

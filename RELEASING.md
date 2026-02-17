@@ -28,6 +28,65 @@
 - [ ] Update PLAN.md (mark release complete, start next version section)
 - [ ] Sync to vault: `cp zimi.py ~/vault/infra/zim-reader/ && cp templates/index.html ~/vault/infra/zim-reader/templates/`
 
+## Desktop App Build
+
+### Prerequisites
+
+```bash
+pip install -r requirements-desktop.txt
+# Installs: libzim, PyMuPDF, pywebview, Pillow, pyinstaller
+```
+
+### Generate icons (if changed)
+
+```bash
+python assets/generate_icons.py
+# Creates: assets/icon.png, assets/icon.ico, assets/icon.icns
+# Requires: Pillow. Uses SF Compact Black on macOS for the Z glyph.
+```
+
+### Build .app (macOS)
+
+```bash
+pyinstaller --noconfirm zimi_desktop.spec
+# Output: dist/Zimi.app (~115 MB)
+# Test:   open dist/Zimi.app
+```
+
+### Build on other platforms
+
+```bash
+# Windows → dist/Zimi/ folder (zip for distribution)
+pyinstaller --noconfirm zimi_desktop.spec
+
+# Linux → dist/Zimi/ folder (tar.gz for distribution)
+pyinstaller --noconfirm zimi_desktop.spec
+```
+
+### Create DMG (macOS distribution)
+
+```bash
+hdiutil create -volname Zimi -srcfolder dist/Zimi.app -ov -format UDZO dist/Zimi.dmg
+# Or with create-dmg for a fancy installer: brew install create-dmg
+# create-dmg --volname "Zimi" --no-internet-enable dist/Zimi.dmg dist/Zimi.app
+```
+
+### GitHub Actions
+
+The `.github/workflows/desktop-release.yml` workflow builds for macOS, Windows, and Linux automatically when a `v*.*.*` tag is pushed. It creates a GitHub Release with:
+- `Zimi.dmg` (macOS)
+- `zimi-windows-amd64.zip` (Windows)
+- `zimi-linux-amd64.tar.gz` (Linux)
+
+### Gotchas
+
+- `dist/` and `build/` are gitignored — never commit build artifacts
+- PyInstaller COPY's source at build time — rebuild after code changes
+- The `.spec` file includes `templates/` and `assets/` as data files
+- macOS: the BUNDLE section creates the `.app` with proper `Info.plist` (CFBundleName=Zimi, icon, bundle ID)
+- The `_set_macos_app_identity()` function in `zimi_desktop.py` is a fallback for dev mode (`python zimi_desktop.py`) but the proper .app build handles Dock icon/name natively via Info.plist
+- Windows build needs a Windows machine or VM (cross-compilation not supported by PyInstaller)
+
 ## Rules
 
 - **Never commit directly to `main`** — always use feature branches + PRs

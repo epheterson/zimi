@@ -6,6 +6,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 WORKDIR /app
 COPY zimi.py zimi_mcp.py ./
 COPY templates/ ./templates/
+COPY assets/ ./assets/
 
 RUN useradd -m -u 1000 zimi && chown -R zimi:zimi /app
 USER zimi

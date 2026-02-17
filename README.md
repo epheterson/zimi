@@ -8,6 +8,8 @@ Search and read 100M+ articles offline. API-first knowledge server for [ZIM file
 - **MCP server** for Claude Code and other AI tool integrations
 - **Web UI** for humans — dark theme, cross-source search, in-browser reader
 - **Library manager** — browse the Kiwix catalog and download ZIMs from the UI
+- **Browse library** — visual category gallery for discovering ZIMs across 9 curated categories
+- **Desktop app** — native window for macOS, Windows, and Linux (no Docker required)
 - **Collections** — group ZIMs into named sets for scoped search
 - **Fast search** — sub-second title matches across all sources, then full-text results
 
@@ -17,9 +19,13 @@ Search and read 100M+ articles offline. API-first knowledge server for [ZIM file
 |----------|---------------|
 | ![Homepage](screenshots/homepage.png) | ![Search](screenshots/search.png) |
 
-| Article Reader | Library Manager |
-|----------------|-----------------|
-| ![Reader](screenshots/reader.png) | ![Library](screenshots/library.png) |
+| Article Reader | Browse Library |
+|----------------|----------------|
+| ![Reader](screenshots/reader.png) | ![Browse Library](screenshots/browse-library.png) |
+
+| Library Manager |
+|-----------------|
+| ![Library](screenshots/manage-page.png) |
 
 ## Quick Start (Docker)
 
@@ -251,10 +257,35 @@ Popular ZIMs:
 
 Place `.zim` files in your ZIM directory and restart Zimi (or use the refresh endpoint).
 
+## Desktop App
+
+Run Zimi as a native desktop application — no Docker or terminal required.
+
+### Install
+
+Download the latest release for your platform from [GitHub Releases](https://github.com/epheterson/Zimi/releases):
+
+- **macOS:** `Zimi.dmg`
+- **Windows:** `zimi-windows-amd64.zip`
+- **Linux:** `zimi-linux-amd64.tar.gz`
+
+On first launch, Zimi prompts you to choose a folder for storing ZIM files, then opens the full web UI in a native window.
+
+### Build from Source
+
+```bash
+pip install -r requirements-desktop.txt
+pyinstaller --noconfirm zimi_desktop.spec
+open dist/Zimi.app  # macOS
+```
+
+See [RELEASING.md](RELEASING.md) for detailed build instructions and platform notes.
+
 ## Architecture
 
 - **`zimi.py`** — HTTP server + CLI + core library (search, read, suggest, random)
 - **`zimi_mcp.py`** — MCP server wrapping core functions for AI agent integration
+- **`zimi_desktop.py`** — Desktop app wrapper using pywebview (native window)
 - **`templates/index.html`** — Single-page web UI (vanilla JS, no build step)
 - **`tests.py`** — Unit and integration tests
 

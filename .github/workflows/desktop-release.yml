@@ -1,0 +1,79 @@
+name: Desktop Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: zimi-linux-amd64
+            package_cmd: tar -czf ../zimi-linux-amd64.tar.gz Zimi
+            asset: zimi-linux-amd64.tar.gz
+          - os: macos-latest
+            artifact: zimi-macos
+            package_cmd: |
+              if command -v create-dmg &>/dev/null; then
+                create-dmg --volname "Zimi" --no-internet-enable ../Zimi.dmg Zimi.app
+              else
+                hdiutil create -volname Zimi -srcfolder Zimi.app -ov -format UDZO ../Zimi.dmg
+              fi
+            asset: Zimi.dmg
+          - os: windows-latest
+            artifact: zimi-windows-amd64
+            package_cmd: Compress-Archive -Path Zimi -DestinationPath ../zimi-windows-amd64.zip
+            asset: zimi-windows-amd64.zip
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements-desktop.txt
+
+      - name: Generate icons
+        run: python assets/generate_icons.py
+
+      - name: Build with PyInstaller
+        run: pyinstaller zimi_desktop.spec
+
+      - name: Package
+        working-directory: dist
+        run: ${{ matrix.package_cmd }}
+        shell: ${{ matrix.os == 'windows-latest' && 'pwsh' || 'bash' }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.asset }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            zimi-linux-amd64/zimi-linux-amd64.tar.gz
+            zimi-macos/Zimi.dmg
+            zimi-windows-amd64/zimi-windows-amd64.zip
