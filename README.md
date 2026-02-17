@@ -152,6 +152,9 @@ python3 zimi.py suggest "pytho"
 
 # Start HTTP server
 python3 zimi.py serve --port 8899
+
+# Start with native desktop window (requires pywebview)
+python3 zimi.py serve --ui
 ```
 
 ## Docker

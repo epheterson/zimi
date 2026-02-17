@@ -2826,6 +2826,9 @@ def main():
 
     p_serve = sub.add_parser("serve", help="Start HTTP API server")
     p_serve.add_argument("--port", type=int, default=8899)
+    p_serve.add_argument("--ui", action="store_true", help="Open in a native desktop window (requires pywebview)")
+
+    sub.add_parser("desktop", help="Start server and open in a native desktop window (requires pywebview)")
 
     args = parser.parse_args()
 
@@ -2856,6 +2859,14 @@ def main():
         for z in zims:
             entries = z['entries'] if isinstance(z['entries'], int) else 0
             print(f"  {z['name']:40s} {z['size_gb']:>8.1f} GB  {entries:>10} entries  ({z['file']})")
+
+    elif args.command == "desktop" or (args.command == "serve" and args.ui):
+        try:
+            from zimi_desktop import main as desktop_main
+        except ImportError:
+            print("Desktop mode requires pywebview: pip install pywebview", file=sys.stderr)
+            sys.exit(1)
+        desktop_main()
 
     elif args.command == "serve":
         print(f"ZIM Reader API starting on port {args.port}")
