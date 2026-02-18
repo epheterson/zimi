@@ -21,6 +21,7 @@ jobs:
             artifact: zimi-linux-amd64
             package_cmd: tar -czf ../zimi-linux-amd64.tar.gz Zimi
             asset: zimi-linux-amd64.tar.gz
+            shell: bash
           - os: macos-latest
             artifact: zimi-macos
             package_cmd: |
@@ -30,10 +31,12 @@ jobs:
                 hdiutil create -volname Zimi -srcfolder Zimi.app -ov -format UDZO ../Zimi.dmg
               fi
             asset: Zimi.dmg
+            shell: bash
           - os: windows-latest
             artifact: zimi-windows-amd64
             package_cmd: Compress-Archive -Path Zimi -DestinationPath ../zimi-windows-amd64.zip
             asset: zimi-windows-amd64.zip
+            shell: pwsh
 
     runs-on: ${{ matrix.os }}
 
@@ -60,7 +63,7 @@ jobs:
       - name: Package
         working-directory: dist
         run: ${{ matrix.package_cmd }}
-        shell: ${{ matrix.os == 'windows-latest' && 'pwsh' || 'bash' }}
+        shell: ${{ matrix.shell }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
