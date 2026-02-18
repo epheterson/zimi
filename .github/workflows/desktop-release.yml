@@ -49,23 +49,45 @@ jobs:
       - name: Generate icons
         run: python assets/generate_icons.py
 
+      - name: Verify libzim installed
+        run: python -c "import libzim; print('libzim OK')"
+
       - name: Build with PyInstaller
-        run: pyinstaller zimi_desktop.spec
+        run: pyinstaller --noconfirm zimi_desktop.spec
 
       - name: Package (Linux)
         if: runner.os == 'Linux'
         working-directory: dist
         run: tar -czf ../zimi-linux-amd64.tar.gz Zimi
 
+      - name: Install create-dmg (macOS)
+        if: runner.os == 'macOS'
+        run: brew install create-dmg
+
       - name: Package (macOS)
         if: runner.os == 'macOS'
         working-directory: dist
         run: |
-          if command -v create-dmg &>/dev/null; then
-            create-dmg --volname "Zimi" --no-internet-enable ../${{ matrix.asset }} Zimi.app
-          else
-            hdiutil create -volname Zimi -srcfolder Zimi.app -ov -format UDZO ../${{ matrix.asset }}
-          fi
+          create-dmg \
+            --volname "Zimi" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "Zimi.app" 150 185 \
+            --app-drop-link 450 185 \
+            --no-internet-enable \
+            ../${{ matrix.asset }} Zimi.app
+
+      - name: Smoke test (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Write-Host "Contents of dist/Zimi/:"
+          Get-ChildItem dist/Zimi/ | Format-Table Name, Length
+          Write-Host "Checking for python DLLs..."
+          Get-ChildItem dist/Zimi/ -Filter "python*.dll" -Recurse | Format-Table FullName
+          Write-Host "Checking for libzim..."
+          Get-ChildItem dist/Zimi/ -Filter "libzim*" -Recurse | Format-Table FullName
 
       - name: Package (Windows)
         if: runner.os == 'Windows'

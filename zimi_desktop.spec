@@ -10,14 +10,54 @@ Output:
     dist/Zimi.app/      — macOS app bundle (macOS only)
 """
 
+import glob
+import os
 import platform
+import sysconfig
 
 block_cipher = None
+
+# ---------------------------------------------------------------------------
+# Collect libzim native libraries
+# ---------------------------------------------------------------------------
+# libzim is a single Cython extension (libzim.cpython-3XX-{platform}.so/.pyd)
+# plus a native C++ shared library (libzim.9.dylib / libzim-9.dll / libzim.so.9).
+# The submodules (reader, search, suggestion) are .pyi stubs, NOT real modules.
+# PyInstaller auto-detects the extension via `import libzim`, but the native
+# shared library lives in a separate libzim/ directory and must be collected
+# explicitly.
+
+def collect_libzim_binaries():
+    """Find libzim native shared libraries for the current platform."""
+    binaries = []
+    site_packages = sysconfig.get_path('purelib')
+
+    # The libzim/ directory contains the native C++ library
+    libzim_dir = os.path.join(site_packages, 'libzim')
+    if not os.path.isdir(libzim_dir):
+        # Try platlib (where compiled packages go)
+        site_packages = sysconfig.get_path('platlib')
+        libzim_dir = os.path.join(site_packages, 'libzim')
+
+    if os.path.isdir(libzim_dir):
+        if platform.system() == 'Darwin':
+            for lib in glob.glob(os.path.join(libzim_dir, '*.dylib')):
+                binaries.append((lib, '.'))
+        elif platform.system() == 'Windows':
+            for lib in glob.glob(os.path.join(libzim_dir, '*.dll')):
+                binaries.append((lib, '.'))
+        elif platform.system() == 'Linux':
+            for lib in glob.glob(os.path.join(libzim_dir, '*.so*')):
+                binaries.append((lib, '.'))
+
+    return binaries
+
+libzim_bins = collect_libzim_binaries()
 
 a = Analysis(
     ['zimi_desktop.py'],
     pathex=[],
-    binaries=[],
+    binaries=libzim_bins,
     datas=[
         ('templates', 'templates'),
         ('assets', 'assets'),
@@ -25,10 +65,6 @@ a = Analysis(
     hiddenimports=[
         'zimi',
         'libzim',
-        'libzim._libzim',
-        'libzim.reader',
-        'libzim.search',
-        'libzim.suggestion',
         'fitz',
         'PIL',
         'webview',
@@ -68,6 +104,8 @@ exe = EXE(
     icon='assets/icon.icns' if platform.system() == 'Darwin' else 'assets/icon.ico',
 )
 
+# contents_directory='.' flattens the _internal/ subfolder on Windows/Linux
+# so users see Zimi.exe + libs in one clean folder (macOS uses .app bundle)
 coll = COLLECT(
     exe,
     a.binaries,
@@ -76,6 +114,7 @@ coll = COLLECT(
     upx=True,
     upx_exclude=[],
     name='Zimi',
+    contents_directory='.' if platform.system() != 'Darwin' else '_internal',
 )
 
 # macOS: wrap into .app bundle
