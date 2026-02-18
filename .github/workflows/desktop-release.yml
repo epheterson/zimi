@@ -19,24 +19,13 @@ jobs:
         include:
           - os: ubuntu-latest
             artifact: zimi-linux-amd64
-            package_cmd: tar -czf ../zimi-linux-amd64.tar.gz Zimi
             asset: zimi-linux-amd64.tar.gz
-            shell: bash
           - os: macos-latest
             artifact: zimi-macos
-            package_cmd: |
-              if command -v create-dmg &>/dev/null; then
-                create-dmg --volname "Zimi" --no-internet-enable ../Zimi.dmg Zimi.app
-              else
-                hdiutil create -volname Zimi -srcfolder Zimi.app -ov -format UDZO ../Zimi.dmg
-              fi
             asset: Zimi.dmg
-            shell: bash
           - os: windows-latest
             artifact: zimi-windows-amd64
-            package_cmd: Compress-Archive -Path Zimi -DestinationPath ../zimi-windows-amd64.zip
             asset: zimi-windows-amd64.zip
-            shell: pwsh
 
     runs-on: ${{ matrix.os }}
 
@@ -60,10 +49,30 @@ jobs:
       - name: Build with PyInstaller
         run: pyinstaller zimi_desktop.spec
 
-      - name: Package
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
         working-directory: dist
-        run: ${{ matrix.package_cmd }}
-        shell: ${{ matrix.shell }}
+        run: tar -czf ../zimi-linux-amd64.tar.gz Zimi
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        working-directory: dist
+        run: |
+          if command -v create-dmg &>/dev/null; then
+            create-dmg --volname "Zimi" --no-internet-enable ../Zimi.dmg Zimi.app
+          else
+            hdiutil create -volname Zimi -srcfolder Zimi.app -ov -format UDZO ../Zimi.dmg
+          fi
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        working-directory: dist
+        shell: pwsh
+        run: Compress-Archive -Path Zimi -DestinationPath ../zimi-windows-amd64.zip
+
+      - name: Move asset to dist
+        run: mv ${{ matrix.asset }} dist/ 2>/dev/null || true
+        shell: bash
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
