@@ -202,6 +202,32 @@ zims/
   ...
 ```
 
+## Library Manager
+
+The built-in library manager is enabled by default (gear icon in the web UI). You can:
+
+- Browse the Kiwix catalog
+- Download ZIMs directly
+- Check for updates to installed ZIMs
+- Refresh the library cache
+
+Management API endpoints:
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /manage/status` | Library status (count, total size) |
+| `GET /manage/catalog?q=...` | Browse Kiwix catalog |
+| `GET /manage/check-updates` | Check for ZIM updates |
+| `GET /manage/downloads` | Active download status |
+| `POST /manage/download` | Start a ZIM download |
+| `POST /manage/refresh` | Re-scan and rebuild cache |
+| `GET /manage/stats` | Server metrics (requests, latency, cache, title index status) |
+| `POST /manage/delete` | Delete a ZIM file |
+| `POST /manage/update` | Update a ZIM to latest version |
+| `POST /manage/cancel` | Cancel an active download |
+| `POST /manage/build-fts` | Build FTS5 index for a ZIM (on-demand deep search) |
+| `POST /manage/auto-update` | Configure auto-update (enable/disable, frequency) |
+
 ## Collections
 
 Collections let you group ZIMs into named sets for scoped search. For example, create a "Dev" collection with Stack Overflow and DevDocs, then search only those sources.
