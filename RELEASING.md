@@ -26,7 +26,7 @@
 
 - [ ] Verify Docker Hub image: `docker pull epheterson/zimi:latest`
 - [ ] Update PLAN.md (mark release complete, start next version section)
-- [ ] Sync to vault: `cp zimi.py ~/vault/infra/zim-reader/ && cp templates/index.html ~/vault/infra/zim-reader/templates/`
+- [ ] Verify desktop builds attached to release (Intel DMG, Apple Silicon DMG, Windows zip, Linux tar.gz)
 
 ## Desktop App Build
 
@@ -74,7 +74,8 @@ hdiutil create -volname Zimi -srcfolder dist/Zimi.app -ov -format UDZO dist/Zimi
 ### GitHub Actions
 
 The `.github/workflows/desktop-release.yml` workflow builds for macOS, Windows, and Linux automatically when a `v*.*.*` tag is pushed. It creates a GitHub Release with:
-- `Zimi.dmg` (macOS)
+- `Zimi-Intel.dmg` (macOS Intel)
+- `Zimi-AppleSilicon.dmg` (macOS M1+)
 - `zimi-windows-amd64.zip` (Windows)
 - `zimi-linux-amd64.tar.gz` (Linux)
 
