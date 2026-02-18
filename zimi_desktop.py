@@ -18,9 +18,14 @@ import threading
 # Windows: configure pythonnet to use CoreCLR (.NET 6+) before any imports
 # that trigger pywebview → pythonnet. Without this, clr_loader defaults to
 # .NET Framework 4.x which can't load the .NET 6 Python.Runtime.dll.
+# In PyInstaller bundles, also point at the bundled .NET runtime.
 # ---------------------------------------------------------------------------
 if platform.system() == "Windows":
     os.environ.setdefault("PYTHONNET_RUNTIME", "coreclr")
+    if getattr(sys, '_MEIPASS', None):
+        _dotnet = os.path.join(sys._MEIPASS, "dotnet_runtime")
+        if os.path.isdir(_dotnet):
+            os.environ.setdefault("DOTNET_ROOT", _dotnet)
 
 
 # ---------------------------------------------------------------------------

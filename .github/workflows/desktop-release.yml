@@ -91,6 +91,24 @@ jobs:
       - name: Build with PyInstaller
         run: pyinstaller --noconfirm zimi_desktop.spec
 
+      - name: Bundle .NET runtime (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Find the .NET 6 runtime (needed by pythonnet/clr_loader)
+          $dotnetRoot = (Get-Command dotnet).Source | Split-Path
+          $runtimeDir = Get-ChildItem "$dotnetRoot\shared\Microsoft.NETCore.App\6.*" |
+            Sort-Object Name -Descending | Select-Object -First 1
+          if (-not $runtimeDir) {
+            Write-Error ".NET 6 runtime not found"
+            exit 1
+          }
+          Write-Host "Bundling .NET runtime from: $($runtimeDir.FullName)"
+          $dest = "dist\Zimi\_internal\dotnet_runtime"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item "$($runtimeDir.FullName)\*" -Destination $dest -Recurse
+          Write-Host "Bundled $(Get-ChildItem $dest | Measure-Object | Select-Object -Expand Count) files"
+
       - name: Test launch (Linux)
         if: runner.os == 'Linux'
         run: |
