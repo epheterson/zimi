@@ -68,7 +68,7 @@ a = Analysis(
         'fitz',
         'PIL',
         'webview',
-    ],
+    ] + (['gi'] if platform.system() == 'Linux' else []),
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

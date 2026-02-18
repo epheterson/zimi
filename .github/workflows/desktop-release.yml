@@ -43,8 +43,19 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgirepository1.0-dev gcc libcairo2-dev pkg-config python3-dev gir1.2-gtk-3.0 gir1.2-webkit2-4.1
+
       - name: Install dependencies
-        run: pip install -r requirements-desktop.txt
+        run: |
+          pip install -r requirements-desktop.txt
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            pip install PyGObject
+          fi
+        shell: bash
 
       - name: Generate icons
         run: python assets/generate_icons.py
