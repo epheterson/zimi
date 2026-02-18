@@ -78,6 +78,31 @@ The `.github/workflows/desktop-release.yml` workflow builds for macOS, Windows, 
 - `zimi-windows-amd64.zip` (Windows)
 - `zimi-linux-amd64.tar.gz` (Linux)
 
+### macOS Code Signing + Notarization
+
+Requires an Apple Developer account ($99/yr). One-time setup:
+
+**1. Export your certificate:**
+- Open Keychain Access
+- Find "Developer ID Application: Your Name (TEAMID)"
+- Right-click → Export → save as `certificate.p12` (set a password)
+
+**2. Add GitHub repo secrets** (Settings → Secrets and variables → Actions):
+
+| Secret | Value |
+|--------|-------|
+| `APPLE_CERTIFICATE_BASE64` | `base64 -i certificate.p12 \| pbcopy` (paste result) |
+| `APPLE_CERTIFICATE_PASSWORD` | Password you set when exporting .p12 |
+| `APPLE_TEAM_ID` | 10-char team ID from developer.apple.com → Membership |
+| `APPLE_ID` | Your Apple ID email |
+| `APPLE_APP_PASSWORD` | App-specific password from appleid.apple.com → Sign-In and Security → App-Specific Passwords |
+
+**3. The workflow handles the rest:**
+- Imports certificate into a temporary keychain
+- `codesign --deep --force --options runtime` on the .app bundle
+- `xcrun notarytool submit` + `xcrun stapler staple` on the DMG
+- Result: users double-click, it just works. No Gatekeeper warnings.
+
 ### Gotchas
 
 - `dist/` and `build/` are gitignored — never commit build artifacts
