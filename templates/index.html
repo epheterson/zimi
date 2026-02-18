@@ -7,6 +7,9 @@
 <link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="apple-touch-icon-precomposed" sizes="180x180" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Zimi">
 <link rel="shortcut icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAADo0lEQVR4nM1XS4scVRT+zrm3qh+ZyQMaRxMQdBgNRM1iCAhqjIuIe/GBuIpxEcV/4MJNAmYniAuZ7LJL1IW4EomoqEEHt0oYxTct4xhH01Ndj3vk3Krq1Ey6x+r0JJMD1Y9Tt873ne/ec+4tYJuNNrlnivsOgEwQn4vns7oEqAKcO2gznqNNZB3vksg6Jw0B9wNmZmaORFH8lHPZfoACovFUENFYkjCbb5vN8Fy32/14I8ZGAj7z+fl5s7T0w1tpmhwXcRpoIlPxiBjWBguzs3e9tLi4mFWVoA0Sud279ywkSfKCiJQDr0//q+ZjEJEJguDM5ct/HS+xqgR0wWWdzh2PRNG/nzjn0soi3Arzi5CZbbM5dXh5+fdPS0wuBnigJFl73jlXik7D5fyfazgB79bYilH12eKPl0MEc5UquMbizI8ZKYsyZwIsjyRBBcYA05bP5qUmKstIu32KYIahF5ppCCW5EvkSGEXTKJYUNWo3Ayxp66RYA7z3TIC5PYR+QuByHUv+O3NA0xK++s3hiXciBFyve1mMYZ0mYWdb0yyoFT0yjgFxhEYItA2QCRBiiwhIIa1zwLPvJmjZXBGSfL6vxILXDzfw0D5CEhNOXkwgTkBW+9AWEChNY335ixsENZppX/D0fRYP7mVYQzh1McH7l1JMt8irgK2egqmwAGegFwP372MsPN5AwzIufJ/htS9i7GiSV6iu8TgENLCu3SQDQgbePtrAdIPQ/Vvw4kfRYLrG6d6MMc1nHwlOPxri0F4DlzJeudDH0opDO8hJ4kYRsAysrgmeO2Bx4qCiMd78Jsa57xLsbBHSwQZ+AwgYyuf93g7jjccaIGZ8/avDq5/3Md2kwZihjWrSRUiAz07lP3O0gU7b4OcVwZMf9PDPmgOCoicUg1sB1d7FbC0CBPQTwWlf79bX+4c/prhnl8Gh2yySLAfUz9gJPusmSDLxz01MgAiIUuDOXYyXHwiBlMEZ4dj+Jo4daANOs+f8mwx6PcHc+S6WM0FQoxvaOgp4IgB+WgV2aAPyLVjgMj0xadN3vhVrsD8jGasSbBk/353ompOrekMD/NETPHz+yrq5rR6Xqke3XioY3YkpKzZCv/3awuuPSES4BODIMOXUsRrXS21EJeR7Z44xwOTKTQRB6yyzbjFXfVXTrOpcI8ChsRWj6qPtPpTyhoE8O3v3iSAIF5jZUL6uzCSXxtBYGlNjV15Qbr0Xk1vi1QwVuykvp9tu/wHSK47GCFrSNAAAAABJRU5ErkJggg==">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -339,10 +342,10 @@
   .manage-card .mc-row .mc-label { color: var(--text2); }
   .manage-card .mc-row .mc-value { color: var(--text); font-weight: 500; }
   .manage-btn-action {
-    padding: 8px 18px; font-size: 13px; font-weight: 500; cursor: pointer;
+    padding: 8px 14px; font-size: 12px; font-weight: 500; cursor: pointer;
     background: linear-gradient(135deg, var(--amber), var(--amber2));
     color: #000; border: none; border-radius: var(--radius);
-    transition: opacity 0.2s;
+    transition: opacity 0.2s; white-space: nowrap;
   }
   .manage-btn-action:hover { opacity: 0.85; }
   .manage-btn-action:disabled { opacity: 0.4; cursor: default; }
@@ -465,7 +468,9 @@
   /* ── Manage tabs ── */
   .manage-tabs {
     display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 16px;
+    overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
   }
+  .manage-tabs::-webkit-scrollbar { display: none; }
   .manage-tab {
     padding: 10px 20px; font-size: 13px; font-weight: 500; cursor: pointer;
     background: none; border: none; border-bottom: 2px solid transparent;
@@ -2724,10 +2729,10 @@ async function renderHistoryTab() {
           : '<span class="ci-letter">' + (esc(title)[0] || '?').toUpperCase() + '</span>';
 
         let label = '', labelColor = 'var(--text2)';
-        if (ev.event === 'updated') { label = 'Updated'; labelColor = 'var(--amber)'; }
-        else if (ev.event === 'download') { label = 'Downloaded'; labelColor = 'var(--green,#4ade80)'; }
-        else if (ev.event === 'download_failed') { label = 'Failed'; labelColor = 'var(--amber)'; }
-        else if (ev.event === 'deleted') { label = 'Deleted'; labelColor = '#ef4444'; }
+        if (ev.event === 'updated') { label = 'Updated'; }
+        else if (ev.event === 'download') { label = 'Downloaded'; }
+        else if (ev.event === 'download_failed') { label = 'Failed'; labelColor = '#ef4444'; }
+        else if (ev.event === 'deleted') { label = 'Deleted'; }
         else { label = ev.event; }
 
         const meta = [];
@@ -2922,7 +2927,7 @@ async function renderManage() {
     '<div id="manage-status" class="manage-card"><h2>Library Status</h2><div class="loading"><span class="spinner-inline"></span>Loading...</div></div>' +
     '<div id="manage-downloads"></div>' +
     '<div class="manage-tabs">' +
-      '<button class="manage-tab' + (manageTab === 'installed' ? ' active' : '') + '" data-tab="installed" onclick="switchManageTab(\'installed\')">Installed (' + installedCount + ')</button>' +
+      '<button class="manage-tab' + (manageTab === 'installed' ? ' active' : '') + '" data-tab="installed" onclick="switchManageTab(\'installed\')">Installed</button>' +
       '<button class="manage-tab' + (manageTab === 'browse' ? ' active' : '') + '" data-tab="browse" onclick="switchManageTab(\'browse\')">Catalog</button>' +
       '<button class="manage-tab' + (manageTab === 'collections' ? ' active' : '') + '" data-tab="collections" onclick="switchManageTab(\'collections\')">Collections</button>' +
       '<button class="manage-tab' + (manageTab === 'history' ? ' active' : '') + '" data-tab="history" onclick="switchManageTab(\'history\')">History</button>' +
@@ -2957,7 +2962,7 @@ async function renderManage() {
             '</select>' +
           '</span>' +
         '</div>' +
-        '<div style="margin-top:12px;display:flex;gap:8px;align-items:center">' +
+        '<div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
           (IS_DESKTOP
             ? '<button class="manage-btn-action" onclick="openSettings()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">&#x2699;&#xFE0F; Settings</button>'
             : '<button id="refresh-cache-btn" class="manage-btn-action" onclick="settingsRefreshCache()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">&#x1F504; Refresh Cache</button>') +
@@ -3324,7 +3329,7 @@ async function deleteZim(filename, btn) {
     const lr = await fetch('/list');
     zimsCache = await lr.json();
     const tabBtn = document.querySelector('.manage-tab[data-tab="installed"]');
-    if (tabBtn) tabBtn.textContent = 'Installed (' + (zimsCache ? zimsCache.length : 0) + ')';
+    if (tabBtn) tabBtn.textContent = 'Installed';
     // Update status card count
     const statusVal = document.querySelector('#manage-status .mc-value');
     if (statusVal) statusVal.textContent = String(zimsCache ? zimsCache.length : 0);
@@ -3474,7 +3479,7 @@ async function refreshDownloads() {
         }
         // Update tab count
         const tabBtn = document.querySelector('.manage-tab[data-tab="installed"]');
-        if (tabBtn) tabBtn.textContent = 'Installed (' + (zimsCache ? zimsCache.length : 0) + ')';
+        if (tabBtn) tabBtn.textContent = 'Installed';
         // Re-render browse view so download buttons update to "Installed"
         if (manageTab === 'browse') {
           if (_browseView === 'drilldown' && manageCategoryFilter) drillCategory(manageCategoryFilter);
