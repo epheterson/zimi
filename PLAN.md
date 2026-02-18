@@ -123,7 +123,8 @@ Progressive search, SQLite title index, collections. See git tag v1.2.0.
 ### Distribution
 - [ ] Homebrew cask (`brew install --cask zimi`) — needs signed .dmg first
 - [ ] Linux packaging (.AppImage or .deb)
-- [ ] Auto-update for the desktop app itself
+- [ ] Sparkle auto-updater for macOS (appcast.xml on GitHub Pages, EdDSA signing)
+- [ ] Windows auto-updater (WinSparkle or custom update check)
 
 ### Other
 - [ ] Create ZIM from website (integrate zim-tools/zimwriterfs)
