@@ -106,12 +106,24 @@ jobs:
             Write-Error "No .NET runtime found"
             exit 1
           }
-          Write-Host "Bundling .NET runtime from: $($runtimeDir.FullName)"
-          # Preserve standard .NET layout: dotnet_runtime/shared/Microsoft.NETCore.App/{version}/
-          $dest = "dist\Zimi\_internal\dotnet_runtime\shared\Microsoft.NETCore.App\$($runtimeDir.Name)"
-          New-Item -ItemType Directory -Force -Path $dest | Out-Null
-          Copy-Item "$($runtimeDir.FullName)\*" -Destination $dest -Recurse
-          Write-Host "Bundled $(Get-ChildItem $dest -Recurse -File | Measure-Object | Select-Object -Expand Count) files"
+          Write-Host "Bundling .NET runtime from: $dotnetRoot"
+          $dest = "dist\Zimi\_internal\dotnet_runtime"
+          # Copy shared/Microsoft.NETCore.App/{version}/ (CoreCLR runtime)
+          $sharedDest = "$dest\shared\Microsoft.NETCore.App\$($runtimeDir.Name)"
+          New-Item -ItemType Directory -Force -Path $sharedDest | Out-Null
+          Copy-Item "$($runtimeDir.FullName)\*" -Destination $sharedDest -Recurse
+          # Copy host/fxr/{version}/ (hostfxr.dll — required by clr_loader)
+          $fxrDir = Get-ChildItem "$dotnetRoot\host\fxr" -Directory |
+            Sort-Object Name -Descending | Select-Object -First 1
+          if ($fxrDir) {
+            $fxrDest = "$dest\host\fxr\$($fxrDir.Name)"
+            New-Item -ItemType Directory -Force -Path $fxrDest | Out-Null
+            Copy-Item "$($fxrDir.FullName)\*" -Destination $fxrDest -Recurse
+            Write-Host "Bundled hostfxr from: $($fxrDir.FullName)"
+          } else {
+            Write-Warning "No hostfxr directory found"
+          }
+          Write-Host "Bundled $(Get-ChildItem $dest -Recurse -File | Measure-Object | Select-Object -Expand Count) files total"
 
       - name: Test launch (Linux)
         if: runner.os == 'Linux'
