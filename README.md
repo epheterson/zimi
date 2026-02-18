@@ -6,8 +6,8 @@ Search and read 100M+ articles offline. Wikipedia, Stack Overflow, dev docs, Wik
 
 **Three ways to run it:**
 
-- **Desktop app** — download, double-click, go. Native window for macOS, Windows, and Linux.
 - **Docker** — self-host on a NAS, server, or anywhere with one command.
+- **Desktop UI** — native window with built-in catalog browser. Requires Python.
 - **Python CLI** — run directly if you already have Python installed.
 
 **What you get:**
@@ -31,19 +31,7 @@ Search and read 100M+ articles offline. Wikipedia, Stack Overflow, dev docs, Wik
 
 ## Quick Start
 
-### Desktop App (easiest)
-
-Download the latest release for your platform from [GitHub Releases](https://github.com/epheterson/Zimi/releases):
-
-- **macOS:** `Zimi-AppleSilicon.dmg` (M1+) or `Zimi-Intel.dmg` — open the DMG, drag to Applications, launch.
-- **Windows:** `zimi-windows-amd64.zip` — extract and run `Zimi.exe`.
-- **Linux:** `zimi-linux-amd64.tar.gz` — extract and run `./Zimi`.
-
-On first launch, Zimi asks you to pick a folder for storing ZIM files. Then it opens the full UI in a native window. Browse the catalog, download your first ZIM, and start reading.
-
-You can also access the same UI from any browser at `http://localhost:8899` while the app is running.
-
-### Docker (self-hosting)
+### Docker (easiest)
 
 **Starting fresh?** Run with an empty directory — the catalog browser lets you download ZIMs from the UI:
 
@@ -59,6 +47,17 @@ docker run -v /path/to/zims:/zims -p 8899:8899 epheterson/zimi
 ```
 
 Open http://localhost:8899 to search, read, and manage your library.
+
+### Desktop UI (native window)
+
+Runs the full web UI inside a native desktop window (WebKit on macOS, Edge WebView2 on Windows, GTK/Qt on Linux). First launch walks you through choosing a ZIM storage folder.
+
+```bash
+pip install -r requirements-desktop.txt
+python3 zimi_desktop.py
+```
+
+You can also access the same UI from any browser at `http://localhost:8899` while the app is running.
 
 ### Python CLI
 
