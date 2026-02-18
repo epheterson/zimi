@@ -185,8 +185,15 @@ jobs:
             --team-id "$APPLE_TEAM_ID" \
             --wait --timeout 10m
 
+          echo "Waiting for notarization ticket to propagate..."
+          sleep 15
+
           echo "Stapling notarization ticket..."
-          xcrun stapler staple ${{ matrix.asset }}
+          for i in 1 2 3; do
+            xcrun stapler staple ${{ matrix.asset }} && break
+            echo "Staple attempt $i failed, retrying in 15s..."
+            sleep 15
+          done
           echo "Notarization complete"
 
       - name: Smoke test
