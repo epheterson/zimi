@@ -50,14 +50,11 @@ Open http://localhost:8899 to search, read, and manage your library.
 
 ### Desktop UI (native window)
 
-Runs the full web UI inside a native desktop window (WebKit on macOS, Edge WebView2 on Windows, GTK/Qt on Linux). First launch walks you through choosing a ZIM storage folder.
+Runs the full web UI inside a native desktop window. First launch walks you through choosing a ZIM storage folder.
 
 ```bash
-pip install -r requirements-desktop.txt
-python3 zimi_desktop.py
+pip install -r requirements-desktop.txt && python3 zimi_desktop.py
 ```
-
-You can also access the same UI from any browser at `http://localhost:8899` while the app is running.
 
 ### Python CLI
 
