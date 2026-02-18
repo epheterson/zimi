@@ -20,7 +20,7 @@ jobs:
           - os: ubuntu-latest
             artifact: zimi-linux-amd64
             asset: zimi-linux-amd64.tar.gz
-          - os: macos-latest
+          - os: macos-13
             artifact: zimi-macos
             asset: Zimi.dmg
           - os: windows-latest
