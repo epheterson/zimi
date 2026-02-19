@@ -470,8 +470,71 @@ def _run():
     webview.start(gui=gui)
 
 
+def _serve_headless():
+    """Run the HTTP server without a GUI window (for CI testing).
+
+    Usage: Zimi --serve [--port PORT] [--zim-dir DIR]
+    Prints 'READY <port>' to stdout when the server is listening.
+    Port 0 picks a random available port.
+    """
+    # Parse --port and --zim-dir from argv
+    port = 8899
+    zim_dir = None
+    args = sys.argv[1:]
+    i = 0
+    while i < len(args):
+        if args[i] == "--port" and i + 1 < len(args):
+            port = int(args[i + 1])
+            i += 2
+        elif args[i] == "--zim-dir" and i + 1 < len(args):
+            zim_dir = args[i + 1]
+            i += 2
+        else:
+            i += 1
+
+    if zim_dir is None:
+        config = ConfigManager()
+        zim_dir = config.get("zim_dir")
+
+    os.environ["ZIM_DIR"] = zim_dir
+    os.environ["ZIMI_MANAGE"] = "1"
+    os.makedirs(zim_dir, exist_ok=True)
+
+    import zimi
+    zimi.ZIM_DIR = zim_dir
+    zimi.ZIMI_DATA_DIR = os.path.join(zim_dir, ".zimi")
+    os.makedirs(zimi.ZIMI_DATA_DIR, exist_ok=True)
+    zimi.ZIMI_MANAGE = True
+    zimi._TITLE_INDEX_DIR = os.path.join(zimi.ZIMI_DATA_DIR, "titles")
+    zimi.load_cache()
+    zimi._migrate_data_files()
+
+    # Pre-warm archives
+    for name in zimi.get_zim_files():
+        try:
+            zimi.get_archive(name)
+        except Exception:
+            pass
+
+    # Build title indexes in background
+    threading.Thread(target=zimi._build_all_title_indexes, daemon=True).start()
+
+    from http.server import ThreadingHTTPServer
+    server = ThreadingHTTPServer(("127.0.0.1", port), zimi.ZimHandler)
+    actual_port = server.server_address[1]
+    print(f"READY {actual_port}", flush=True)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        server.shutdown()
+
+
 def main():
     """Wrapper that restarts the app when exit code is 42."""
+    if "--serve" in sys.argv:
+        _serve_headless()
+        return
+
     if "--run" in sys.argv:
         _run()
         return

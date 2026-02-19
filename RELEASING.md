@@ -2,14 +2,16 @@
 
 ## Pre-release
 
-- [ ] All changes on a feature branch (e.g. `v1.3`), NOT on `main`
-- [ ] Tests pass: `python3 tests.py`
+- [ ] All changes on a feature branch (e.g. `v1.4`), NOT on `main`
+- [ ] Unit tests pass: `python3 tests.py`
+- [ ] Integration tests pass: `python3 -m pytest tests/test_server.py -v`
 - [ ] README updated (features, endpoints, screenshots)
-- [ ] CHANGELOG.md updated with new version section
 - [ ] Deployed and verified on NAS
 - [ ] Screenshots current
 
-## Release
+## Release (two-phase)
+
+**Phase 1: Build + Draft**
 
 - [ ] Squash feature branch to single commit
 - [ ] Open PR from feature branch → `main`
@@ -18,9 +20,28 @@
 - [ ] Pull main locally: `git checkout main && git pull`
 - [ ] Tag: `git tag v1.X.0`
 - [ ] Push tag: `git push origin v1.X.0`
-- [ ] Create GitHub release from tag (copy CHANGELOG section as notes)
-- [ ] Docker Hub multi-arch build runs automatically (GitHub Actions triggers on tag push)
-- [ ] Verify build passed: `gh run list --repo epheterson/Zimi --limit 3`
+- [ ] CI builds, runs tests, creates **draft** release with artifacts
+- [ ] Verify CI passed: `gh run list --repo epheterson/Zimi --limit 3`
+
+**Phase 2: Manual QA → Publish**
+
+Before publishing a draft release, verify on real hardware:
+
+- [ ] Download macOS DMG (Apple Silicon or Intel, whichever you have)
+- [ ] Install app, launch with real ZIM files
+- [ ] Verify search works across multiple sources
+- [ ] Verify PDF viewer opens zimgit PDFs in reader (not externally)
+- [ ] Verify article navigation history (click links within articles)
+- [ ] Verify back button steps through history, then closes reader
+- [ ] Verify desktop title bar syncs with article titles
+- [ ] Verify catalog browse, download flow, and update check
+- [ ] Test on clean install (delete `~/.config/zimi/` or equivalent first)
+- [ ] (Optional) Linux: download tar.gz, extract, run `./Zimi --serve`
+
+When QA passes:
+
+- [ ] Publish draft release (GitHub → Releases → Edit → Publish)
+- [ ] Docker Hub multi-arch build runs automatically on published tag
 
 ## Post-release
 
@@ -73,10 +94,19 @@ hdiutil create -volname Zimi -srcfolder dist/Zimi.app -ov -format UDZO dist/Zimi
 
 ### GitHub Actions
 
-The `.github/workflows/desktop-release.yml` workflow builds for macOS, Windows, and Linux automatically when a `v*.*.*` tag is pushed. It creates a GitHub Release with:
-- `Zimi.dmg` (macOS)
-- `zimi-windows-amd64.zip` (Windows)
-- `zimi-linux-amd64.tar.gz` (Linux)
+The `.github/workflows/desktop-release.yml` workflow builds for macOS, Windows, and Linux automatically when a `v*.*.*` tag is pushed. It:
+
+1. Runs unit tests and integration tests (pre-build)
+2. Builds with PyInstaller
+3. Runs smoke tests against the built binary using `--serve` flag
+4. Creates a **draft** GitHub Release with artifacts
+
+Release artifacts:
+- `Zimi-AppleSilicon.dmg` and `Zimi-Intel.dmg` (macOS)
+- `Zimi-Windows-amd64.zip` (Windows)
+- `Zimi-Linux-amd64.tar.gz` (Linux)
+
+After manual QA, publish the draft to make it visible to users.
 
 ### macOS Code Signing + Notarization
 

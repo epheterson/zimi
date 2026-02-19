@@ -66,6 +66,19 @@ jobs:
         if: runner.os == 'Linux'
         run: pip install PyGObject
 
+      - name: Install pytest
+        run: pip install pytest
+
+      # ── Pre-build tests ──────────────────────────────────────────────
+
+      - name: Run unit tests
+        run: python tests.py
+
+      - name: Run integration tests
+        run: python -m pytest tests/test_server.py -v
+
+      # ── Build ─────────────────────────────────────────────────────────
+
       - name: Generate icons
         run: python assets/generate_icons.py
 
@@ -125,11 +138,158 @@ jobs:
           }
           Write-Host "Bundled $(Get-ChildItem $dest -Recurse -File | Measure-Object | Select-Object -Expand Count) files total"
 
-      - name: Test launch (Linux)
-        if: runner.os == 'Linux'
+      # ── Post-build smoke tests ────────────────────────────────────────
+
+      - name: Smoke test built binary (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
         run: |
-          timeout 10 dist/Zimi/Zimi --help 2>&1 || echo "Exit code: $?"
-          echo "Binary exists and was attempted"
+          BINARY="dist/Zimi.app/Contents/MacOS/Zimi"
+          TMPZIM=$(mktemp -d)
+          echo "Starting Zimi with --serve --port 0 ..."
+          $BINARY --serve --port 0 --zim-dir "$TMPZIM" > /tmp/zimi_out.txt 2>&1 &
+          PID=$!
+
+          # Wait for READY message (up to 30s)
+          PORT=""
+          for i in $(seq 1 60); do
+            if grep -q "^READY " /tmp/zimi_out.txt 2>/dev/null; then
+              PORT=$(grep "^READY " /tmp/zimi_out.txt | head -1 | awk '{print $2}')
+              break
+            fi
+            sleep 0.5
+          done
+
+          if [ -z "$PORT" ]; then
+            echo "ERROR: Server did not start within 30s"
+            cat /tmp/zimi_out.txt
+            kill $PID 2>/dev/null || true
+            exit 1
+          fi
+
+          echo "Server ready on port $PORT"
+          BASE="http://127.0.0.1:$PORT"
+
+          # Hit endpoints
+          echo "Testing /health..."
+          curl -sf "$BASE/health" | python -c "import sys,json; d=json.load(sys.stdin); assert d['status']=='ok', f'Bad health: {d}'; print(f'  OK: v{d[\"version\"]}, {d[\"zim_count\"]} ZIMs')"
+
+          echo "Testing /list..."
+          curl -sf "$BASE/list" | python -c "import sys,json; d=json.load(sys.stdin); print(f'  OK: {len(d)} sources')"
+
+          echo "Testing /search..."
+          curl -sf "$BASE/search?q=test&limit=1&fast=1" | python -c "import sys,json; d=json.load(sys.stdin); assert 'results' in d; print(f'  OK: {d[\"total\"]} results')"
+
+          echo "Testing /static/pdfjs/web/viewer.html..."
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/static/pdfjs/web/viewer.html")
+          [ "$STATUS" = "200" ] && echo "  OK: pdf.js viewer" || { echo "FAIL: got $STATUS"; exit 1; }
+
+          echo "Testing /manage/status..."
+          curl -sf "$BASE/manage/status" | python -c "import sys,json; d=json.load(sys.stdin); assert 'zim_count' in d; print(f'  OK: {d[\"zim_count\"]} ZIMs, manage={d[\"manage_enabled\"]}')"
+
+          echo "Testing / (web UI)..."
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/")
+          [ "$STATUS" = "200" ] && echo "  OK: web UI" || { echo "FAIL: got $STATUS"; exit 1; }
+
+          echo "All smoke tests passed!"
+          kill $PID 2>/dev/null || true
+          rm -rf "$TMPZIM"
+
+      - name: Smoke test built binary (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          BINARY="dist/Zimi/Zimi"
+          TMPZIM=$(mktemp -d)
+          echo "Starting Zimi with --serve --port 0 ..."
+          $BINARY --serve --port 0 --zim-dir "$TMPZIM" > /tmp/zimi_out.txt 2>&1 &
+          PID=$!
+
+          PORT=""
+          for i in $(seq 1 60); do
+            if grep -q "^READY " /tmp/zimi_out.txt 2>/dev/null; then
+              PORT=$(grep "^READY " /tmp/zimi_out.txt | head -1 | awk '{print $2}')
+              break
+            fi
+            sleep 0.5
+          done
+
+          if [ -z "$PORT" ]; then
+            echo "ERROR: Server did not start within 30s"
+            cat /tmp/zimi_out.txt
+            kill $PID 2>/dev/null || true
+            exit 1
+          fi
+
+          echo "Server ready on port $PORT"
+          BASE="http://127.0.0.1:$PORT"
+
+          echo "Testing /health..."
+          curl -sf "$BASE/health" | python -c "import sys,json; d=json.load(sys.stdin); assert d['status']=='ok'; print(f'  OK: v{d[\"version\"]}')"
+
+          echo "Testing /static/pdfjs/web/viewer.html..."
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/static/pdfjs/web/viewer.html")
+          [ "$STATUS" = "200" ] && echo "  OK: pdf.js viewer" || { echo "FAIL: got $STATUS"; exit 1; }
+
+          echo "Testing / (web UI)..."
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/")
+          [ "$STATUS" = "200" ] && echo "  OK: web UI" || { echo "FAIL: got $STATUS"; exit 1; }
+
+          echo "All smoke tests passed!"
+          kill $PID 2>/dev/null || true
+          rm -rf "$TMPZIM"
+
+      - name: Smoke test built binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $BINARY = "dist\Zimi\Zimi.exe"
+          $TMPZIM = New-TemporaryFile | ForEach-Object { Remove-Item $_; New-Item -ItemType Directory -Path $_ }
+          Write-Host "Starting Zimi with --serve --port 0 ..."
+
+          $proc = Start-Process -FilePath $BINARY -ArgumentList "--serve","--port","0","--zim-dir",$TMPZIM.FullName `
+            -RedirectStandardOutput "$env:TEMP\zimi_out.txt" -RedirectStandardError "$env:TEMP\zimi_err.txt" `
+            -PassThru -NoNewWindow
+
+          $PORT = $null
+          for ($i = 0; $i -lt 60; $i++) {
+            Start-Sleep -Milliseconds 500
+            if (Test-Path "$env:TEMP\zimi_out.txt") {
+              $content = Get-Content "$env:TEMP\zimi_out.txt" -ErrorAction SilentlyContinue
+              $ready = $content | Where-Object { $_ -match "^READY (\d+)" }
+              if ($ready) {
+                $PORT = $Matches[1]
+                break
+              }
+            }
+          }
+
+          if (-not $PORT) {
+            Write-Host "ERROR: Server did not start within 30s"
+            Get-Content "$env:TEMP\zimi_out.txt" -ErrorAction SilentlyContinue
+            Get-Content "$env:TEMP\zimi_err.txt" -ErrorAction SilentlyContinue
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            exit 1
+          }
+
+          Write-Host "Server ready on port $PORT"
+          $BASE = "http://127.0.0.1:$PORT"
+
+          Write-Host "Testing /health..."
+          $resp = Invoke-RestMethod "$BASE/health"
+          if ($resp.status -ne "ok") { Write-Error "Health check failed"; exit 1 }
+          Write-Host "  OK: v$($resp.version)"
+
+          Write-Host "Testing /static/pdfjs/web/viewer.html..."
+          $r = Invoke-WebRequest "$BASE/static/pdfjs/web/viewer.html" -UseBasicParsing
+          if ($r.StatusCode -ne 200) { Write-Error "pdf.js viewer not found"; exit 1 }
+          Write-Host "  OK: pdf.js viewer"
+
+          Write-Host "All smoke tests passed!"
+          Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+          Remove-Item $TMPZIM.FullName -Recurse -Force -ErrorAction SilentlyContinue
+
+      # ── Packaging ─────────────────────────────────────────────────────
 
       - name: Package (Linux)
         if: runner.os == 'Linux'
@@ -230,18 +390,6 @@ jobs:
           done
           echo "Notarization complete"
 
-      - name: Smoke test
-        shell: bash
-        run: |
-          echo "=== Top-level contents of dist/Zimi/ ==="
-          ls -la dist/Zimi/ | head -30
-          echo ""
-          echo "=== Looking for libzim files ==="
-          find dist/Zimi/ -name "libzim*" -o -name "zim*" 2>/dev/null || true
-          echo ""
-          echo "=== Looking for python shared libs ==="
-          find dist/Zimi/ -name "python*" -type f 2>/dev/null | head -10 || true
-
       - name: Package (Windows)
         if: runner.os == 'Windows'
         working-directory: dist
@@ -266,10 +414,11 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
 
-      - name: Upload to GitHub Release
+      - name: Create draft release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          draft: true
           files: |
             Zimi-Linux-amd64/Zimi-Linux-amd64.tar.gz
             Zimi-Intel/Zimi-Intel.dmg

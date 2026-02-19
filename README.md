@@ -282,6 +282,26 @@ pip install -r requirements-desktop.txt
 python3 zimi_desktop.py
 ```
 
+## Zimi vs kiwix-serve
+
+[kiwix-serve](https://github.com/kiwix/kiwix-tools) is the official ZIM server from the Kiwix project. Both serve ZIM files over HTTP — here's how they differ:
+
+| | Zimi | kiwix-serve |
+|---|---|---|
+| **Search API** | JSON responses — easy to parse in scripts, bots, AI agents | HTML responses — designed for browser rendering |
+| **Cross-source search** | Unified results across all ZIMs with relevance ranking | Per-ZIM search; multi-ZIM mode returns combined but unranked results |
+| **Search speed** | Two-phase progressive: instant SQLite title matches, then Xapian full-text | Xapian full-text per ZIM (fast within a single source) |
+| **Library management** | Built-in: browse catalog, download, update, delete from the UI | Separate tool (kiwix-manage) for library operations |
+| **AI integration** | MCP server for Claude Code and other AI agents | None |
+| **Desktop app** | Native macOS app with catalog browser | None (browser-based only) |
+| **Runtime** | Python (~1,600 lines) | C++ (part of libkiwix) |
+| **Memory** | Higher (Python + per-ZIM SQLite indexes) | Lower (native C++ with shared Xapian indexes) |
+| **Maturity** | New (2026) | Established, widely deployed |
+
+**When to use kiwix-serve:** You want a lightweight, proven ZIM server with minimal resource usage — especially on low-memory devices or embedded systems.
+
+**When to use Zimi:** You want a JSON API, cross-source search, built-in library management, AI agent integration, or a desktop app with a visual catalog.
+
 ## Architecture
 
 - **`zimi.py`** — HTTP server + CLI + core library (search, read, suggest, random)
