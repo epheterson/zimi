@@ -66,7 +66,8 @@
     color: var(--text); transition: background 0.1s;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .history-item:hover { background: var(--amber-glow); color: var(--amber); }
+  .history-item:hover, .history-item.hover { background: var(--amber-glow); color: var(--amber); }
+  #history-trail, .back-btn { user-select: none; -webkit-user-select: none; }
   .history-item .hi-source {
     flex-shrink: 0; font-size: 10px; font-weight: 600;
     color: var(--text2); background: var(--surface2);
@@ -1235,38 +1236,64 @@ function _hideHistoryTrail() {
   _historyTrail.classList.remove('visible');
 }
 
-_historyTrail.addEventListener('click', function(e) {
-  var item = e.target.closest('.history-item');
-  if (!item) return;
+function _navigateHistoryItem(el) {
+  var item = el.closest('.history-item');
+  if (!item) return false;
   var idx = parseInt(item.dataset.idx, 10);
-  if (isNaN(idx) || idx < 0 || idx >= articleHistory.length) return;
+  if (isNaN(idx) || idx < 0 || idx >= articleHistory.length) return false;
   var target = articleHistory[idx];
-  // Remove this entry and everything after it from history
-  // (navigating to a history entry discards forward history)
   articleHistory.splice(idx);
   _hideHistoryTrail();
-  currentArticle = null; // will be set by openArticle
+  currentArticle = null;
   openArticle(target.zim, target.path);
+  return true;
+}
+
+// Click on trail item (for right-click-then-click flow)
+_historyTrail.addEventListener('click', function(e) { _navigateHistoryItem(e.target); });
+
+// Hover highlight during long-press drag
+_historyTrail.addEventListener('mouseover', function(e) {
+  var item = e.target.closest('.history-item');
+  _historyTrail.querySelectorAll('.history-item').forEach(function(el) { el.classList.toggle('hover', el === item); });
+});
+_historyTrail.addEventListener('mouseleave', function() {
+  _historyTrail.querySelectorAll('.history-item.hover').forEach(function(el) { el.classList.remove('hover'); });
 });
 
-// Long-press on back button (500ms) — show history trail
+// Long-press on back button (500ms) — show history trail, support slide-to-select
 backBtn.addEventListener('mousedown', function(e) {
   if (e.button !== 0) return;
   _histLongPressActive = false;
   _histLongPressTimer = setTimeout(function() {
     _histLongPressTimer = null;
-    _histLongPressActive = true; // suppress the click event that follows mouseup
+    _histLongPressActive = true;
     _showHistoryTrail();
   }, 500);
-});
-backBtn.addEventListener('mouseup', function() {
-  if (_histLongPressTimer) { clearTimeout(_histLongPressTimer); _histLongPressTimer = null; }
 });
 backBtn.addEventListener('mouseleave', function() {
   if (_histLongPressTimer) { clearTimeout(_histLongPressTimer); _histLongPressTimer = null; }
 });
+
+// On mouseup anywhere: if long-press trail is open, check if releasing over a trail item
+document.addEventListener('mouseup', function(e) {
+  if (!_histLongPressActive) {
+    // Short press — cancel timer if still pending
+    if (_histLongPressTimer) { clearTimeout(_histLongPressTimer); _histLongPressTimer = null; }
+    return;
+  }
+  _histLongPressActive = false;
+  // Check if released over a trail item
+  var el = document.elementFromPoint(e.clientX, e.clientY);
+  if (el && _historyTrail.contains(el)) {
+    _navigateHistoryItem(el);
+  } else {
+    _hideHistoryTrail();
+  }
+});
+
 backBtn.addEventListener('click', function(e) {
-  if (_histLongPressActive) { _histLongPressActive = false; e.stopImmediatePropagation(); e.preventDefault(); return; }
+  if (_historyTrail.classList.contains('visible')) { e.preventDefault(); return; }
   goBack();
 });
 
@@ -1277,7 +1304,7 @@ backBtn.addEventListener('contextmenu', function(e) {
   _showHistoryTrail();
 });
 
-// Close history trail on outside click
+// Close history trail on outside click (for right-click flow)
 document.addEventListener('click', function(e) {
   if (_historyTrail.classList.contains('visible') && !_historyTrail.contains(e.target) && e.target !== backBtn) {
     _hideHistoryTrail();

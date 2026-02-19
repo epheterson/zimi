@@ -2335,7 +2335,7 @@ class ZimHandler(BaseHTTPRequestHandler):
                 # ?raw=1 bypasses SPA shell (used for PDF new-tab opening to avoid loops).
                 fetch_dest = self.headers.get("Sec-Fetch-Dest", "")
                 is_raw = "raw" in parse_qs(parsed.query)
-                if (fetch_dest == "document" or not entry_path) and not is_raw and not any(entry_path.lower().endswith(ext) for ext in (".pdf", ".epub")):
+                if (fetch_dest == "document" or not entry_path) and not is_raw and not entry_path.lower().endswith(".epub"):
                     return self._serve_index()
                 # Track iframe article loads
                 if fetch_dest == "iframe":
