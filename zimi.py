@@ -2777,38 +2777,26 @@ class ZimHandler(BaseHTTPRequestHandler):
         if os.path.isabs(rel_path):
             return self._json(400, {"error": "invalid path"})
 
-        # Check cache first
+        # Check cache first, then read from disk
         cached = ZimHandler._static_cache.get(rel_path)
         if cached:
             body, content_type = cached
-            self.send_response(200)
-            self.send_header("Content-Type", content_type)
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "public, max-age=31536000, immutable")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            self.wfile.write(body)
-            return
-
-        base = ZimHandler._static_base_dir()
-        if not base:
-            return self._json(404, {"error": "static directory not found"})
-
-        file_path = os.path.normpath(os.path.join(base, rel_path))
-        # Ensure resolved path is still inside the static dir
-        if not file_path.startswith(os.path.normpath(base) + os.sep) and file_path != os.path.normpath(base):
-            return self._json(403, {"error": "forbidden"})
-        if not os.path.isfile(file_path):
-            return self._json(404, {"error": "not found"})
-
-        ext = os.path.splitext(file_path)[1].lower()
-        content_type = MIME_FALLBACK.get(ext, "application/octet-stream")
-
-        with open(file_path, "rb") as f:
-            body = f.read()
-
-        # Cache all static files in memory (vendor files are immutable)
-        ZimHandler._static_cache[rel_path] = (body, content_type)
+        else:
+            base = ZimHandler._static_base_dir()
+            if not base:
+                return self._json(404, {"error": "static directory not found"})
+            file_path = os.path.normpath(os.path.join(base, rel_path))
+            # Ensure resolved path is still inside the static dir
+            if not file_path.startswith(os.path.normpath(base) + os.sep) and file_path != os.path.normpath(base):
+                return self._json(403, {"error": "forbidden"})
+            if not os.path.isfile(file_path):
+                return self._json(404, {"error": "not found"})
+            ext = os.path.splitext(file_path)[1].lower()
+            content_type = MIME_FALLBACK.get(ext, "application/octet-stream")
+            with open(file_path, "rb") as f:
+                body = f.read()
+            # Cache in memory (vendor files are immutable, ~8MB total for pdf.js)
+            ZimHandler._static_cache[rel_path] = (body, content_type)
 
         self.send_response(200)
         self.send_header("Content-Type", content_type)

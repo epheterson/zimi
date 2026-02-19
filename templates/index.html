@@ -1170,21 +1170,7 @@ function goBack() {
   if (readerOpen) {
     // Step back through article history before closing reader
     if (articleHistory.length > 0) {
-      var prev = articleHistory.pop();
-      currentArticle = { zim: prev.zim, path: prev.path };
-      readerSource = prev.zim;
-      var url = '/w/' + encodeURIComponent(prev.zim) + '/' + prev.path.split('/').map(encodeURIComponent).join('/');
-      var lurl = url.toLowerCase();
-      if (lurl.endsWith('.pdf')) url = _pdfViewerUrl(url);
-      history.replaceState({ mode: 'reader', zim: prev.zim, path: prev.path }, '', url);
-      var frame = document.getElementById('reader-frame');
-      var loading = document.getElementById('reader-loading');
-      loading.classList.remove('hidden');
-      try { frame.contentWindow.location.replace(url); } catch(e) { frame.src = url; }
-      var t = prev.title + ' — Zimi';
-      document.title = t;
-      _setWindowTitle(t);
-      updateTopbar();
+      _stepBackToArticle(articleHistory.pop(), true);
       return;
     }
     closeReader();
@@ -1213,18 +1199,15 @@ var _histLongPressActive = false; // true after long-press fires — suppresses 
 
 function _showHistoryTrail() {
   if (articleHistory.length === 0) return; // nothing to show
-  {
-    var h = '';
-    // Show most recent first
-    for (var i = articleHistory.length - 1; i >= 0; i--) {
-      var item = articleHistory[i];
-      h += '<div class="history-item" data-idx="' + i + '">';
-      h += '<span class="hi-source">' + esc(_zimTitle(item.zim)) + '</span>';
-      h += '<span class="hi-title">' + esc(item.title || item.path) + '</span>';
-      h += '</div>';
-    }
-    _historyTrail.innerHTML = h;
+  var h = '';
+  for (var i = articleHistory.length - 1; i >= 0; i--) {
+    var item = articleHistory[i];
+    h += '<div class="history-item" data-idx="' + i + '">';
+    h += '<span class="hi-source">' + esc(_zimTitle(item.zim)) + '</span>';
+    h += '<span class="hi-title">' + esc(item.title || item.path) + '</span>';
+    h += '</div>';
   }
+  _historyTrail.innerHTML = h;
   // Position below the back button
   var btn = backBtn.getBoundingClientRect();
   _historyTrail.style.left = Math.max(4, btn.left) + 'px';
@@ -3788,13 +3771,42 @@ async function manageClearPassword() {
   }
 }
 
-// ── PDF viewer helper ──
+// ── Helpers ──
 function _pdfViewerUrl(pdfUrl) {
-  // Build pdf.js viewer URL for an in-ZIM PDF.
-  // pdf.js fetches via XHR (Sec-Fetch-Dest: empty) so the server serves raw
-  // PDF content without needing ?raw=1. Don't encodeURIComponent — the URL is
-  // already properly percent-encoded and double-encoding breaks pdf.js.
+  // pdfUrl is already percent-encoded (/w/zim/path%20name.pdf).
+  // Don't encodeURIComponent — pdf.js passes file param directly to fetch.
   return '/static/pdfjs/web/viewer.html?file=' + pdfUrl;
+}
+function _articleUrl(zim, path) {
+  return '/w/' + encodeURIComponent(zim) + '/' + path.split('/').map(encodeURIComponent).join('/');
+}
+function _titleFromPath(path) {
+  return decodeURIComponent(path.split('/').pop() || '').replace(/_/g, ' ');
+}
+function _downloadFile(url) {
+  var a = document.createElement('a');
+  a.href = url; a.download = ''; a.style.display = 'none';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+function _stepBackToArticle(prev, replaceState) {
+  // Navigate reader to a previous article from history.
+  // replaceState=true for in-app back (URL hasn't changed yet),
+  // replaceState=false for browser back (URL already changed by popstate).
+  currentArticle = { zim: prev.zim, path: prev.path };
+  readerSource = prev.zim;
+  var url = _articleUrl(prev.zim, prev.path);
+  var lurl = url.toLowerCase();
+  // PDFs need ?view=1 in URL so CDN cache serves SPA shell on reload
+  if (replaceState) {
+    var stateUrl = lurl.endsWith('.pdf') ? url + '?view=1' : url;
+    history.replaceState({ mode: 'reader', zim: prev.zim, path: prev.path }, '', stateUrl);
+  }
+  if (lurl.endsWith('.pdf')) url = _pdfViewerUrl(url);
+  var t = (prev.title || _titleFromPath(prev.path)) + ' \u2014 Zimi';
+  document.title = t;
+  _setWindowTitle(t);
+  updateTopbar();
+  openReader(url);
 }
 
 // ── Reader ──
@@ -3804,9 +3816,7 @@ function openReader(url) {
   if (lurl.endsWith('.epub')) {
     var extUrl = url + (url.includes('?') ? '&' : '?') + 'raw=1';
     if (!/^https?:\/\//.test(extUrl)) extUrl = location.origin + extUrl;
-    var dl = document.createElement('a');
-    dl.href = extUrl; dl.download = ''; dl.style.display = 'none';
-    document.body.appendChild(dl); dl.click(); document.body.removeChild(dl);
+    _downloadFile(extUrl);
     return false;
   }
   // PDFs: render in embedded pdf.js viewer (skip if already a viewer URL)
@@ -3846,13 +3856,11 @@ function openReader(url) {
         if (lhref.endsWith('.epub')) {
           e.preventDefault();
           if (!fullUrl.includes('raw=1')) fullUrl += (fullUrl.includes('?') ? '&' : '?') + 'raw=1';
-          var dl = document.createElement('a');
-          dl.href = fullUrl; dl.download = ''; dl.style.display = 'none';
-          document.body.appendChild(dl); dl.click(); document.body.removeChild(dl);
+          _downloadFile(fullUrl);
           return;
         }
-        // In-ZIM links (/w/<zim>/<path>): route through openArticle for history tracking
-        var wMatch = fullUrl.match(/\/w\/([^\/]+)\/(.+)/);
+        // In-ZIM links (same-origin /w/<zim>/<path>): route through openArticle for history tracking
+        var wMatch = fullUrl.startsWith(location.origin) && fullUrl.match(/\/w\/([^\/]+)\/(.+)/);
         if (wMatch) {
           e.preventDefault();
           var linkZim = decodeURIComponent(wMatch[1]);
@@ -3873,8 +3881,7 @@ function openReader(url) {
       var iTitle = frame.contentDocument && frame.contentDocument.title;
       if (!iTitle) {
         // Fallback: extract from iframe URL path
-        var iPath = frame.contentWindow.location.pathname;
-        var seg = decodeURIComponent(iPath.split('/').pop() || '').replace(/_/g, ' ');
+        var seg = _titleFromPath(frame.contentWindow.location.pathname);
         if (seg && seg !== 'blank') iTitle = seg;
       }
       if (iTitle) {
@@ -3894,23 +3901,20 @@ function _pushArticleHistory(zim, path) {
   if (!zim || !path) return;
   // Use current document title if available (more accurate than URL-derived)
   var docTitle = document.title.replace(/ — Zimi$/, '');
-  var fallback = decodeURIComponent(path.split('/').pop() || '').replace(/_/g, ' ');
+  var fallback = _titleFromPath(path);
   var title = (docTitle && docTitle !== 'Zimi') ? docTitle : fallback;
   articleHistory.push({ zim: zim, path: path, title: title, timestamp: Date.now() });
   if (articleHistory.length > 50) articleHistory.shift();
 }
 
 function openArticle(zim, path) {
-  var url = '/w/' + encodeURIComponent(zim) + '/' + path.split('/').map(encodeURIComponent).join('/');
+  var url = _articleUrl(zim, path);
   readerSource = zim;
   // EPUB: download (Gutenberg has HTML equivalents for all EPUBs)
   var lurl = url.toLowerCase();
   if (lurl.endsWith('.epub')) {
-    var extUrl = url + '?raw=1';
-    if (!/^https?:\/\//.test(extUrl)) extUrl = location.origin + extUrl;
-    var a = document.createElement('a');
-    a.href = extUrl; a.download = ''; a.style.display = 'none';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    var extUrl = location.origin + url + '?raw=1';
+    _downloadFile(extUrl);
     return;
   }
   // Track article history: push current article before navigating away
@@ -3925,7 +3929,7 @@ function openArticle(zim, path) {
     url = _pdfViewerUrl(url);
   }
   openReader(url);
-  var readerTitle = decodeURIComponent(path.split('/').pop() || '').replace(/_/g, ' ');
+  var readerTitle = _titleFromPath(path);
   if (readerTitle) {
     var t2 = readerTitle + ' — Zimi';
     document.title = t2;
@@ -3997,16 +4001,7 @@ window.addEventListener('popstate', (e) => {
   _hideHistoryTrail();
   // Step through article history when reader is open (mirrors in-app back button)
   if (readerOpen && articleHistory.length > 0) {
-    var prev = articleHistory.pop();
-    currentArticle = prev;
-    var t = (prev.title || prev.path) + ' — Zimi';
-    document.title = t;
-    _setWindowTitle(t);
-    updateTopbar();
-    // Navigate iframe to the previous article
-    var url = '/w/' + encodeURIComponent(prev.zim) + '/' + prev.path;
-    if (prev.path.toLowerCase().endsWith('.pdf')) url = _pdfViewerUrl(url);
-    openReader(url);
+    _stepBackToArticle(articleHistory.pop(), false);
     return;
   }
   if (readerOpen) closeReader();
