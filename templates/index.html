@@ -740,7 +740,7 @@
     <span id="bc-sep" class="bc-sep" style="display:none">/</span>
     <span id="bc-icon" class="bc-icon" style="display:none"></span>
   </div>
-  <button id="back-btn" class="back-btn" onclick="goBack()" aria-label="Go back" style="display:none">&#x2190;</button>
+  <button id="back-btn" class="back-btn" aria-label="Go back" style="display:none">&#x2190;</button>
   <div id="history-trail"></div>
   <div class="topbar-search">
     <input type="text" id="q" placeholder="Search everything..." autofocus aria-label="Search" autocomplete="off">
@@ -1218,7 +1218,7 @@ function _showHistoryTrail() {
     for (var i = articleHistory.length - 1; i >= 0; i--) {
       var item = articleHistory[i];
       h += '<div class="history-item" data-idx="' + i + '">';
-      h += '<span class="hi-source">' + esc(item.zim.replace(/^(wikipedia|stackoverflow).*/, '$1').substring(0, 12)) + '</span>';
+      h += '<span class="hi-source">' + esc(_zimTitle(item.zim)) + '</span>';
       h += '<span class="hi-title">' + esc(item.title || item.path) + '</span>';
       h += '</div>';
     }
@@ -1267,6 +1267,7 @@ backBtn.addEventListener('mouseleave', function() {
 });
 backBtn.addEventListener('click', function(e) {
   if (_histLongPressActive) { _histLongPressActive = false; e.stopImmediatePropagation(); e.preventDefault(); return; }
+  goBack();
 });
 
 // Right-click on back button — show history trail
@@ -3777,8 +3778,8 @@ function openReader(url) {
     document.body.appendChild(dl); dl.click(); document.body.removeChild(dl);
     return false;
   }
-  // PDFs: render in embedded pdf.js viewer
-  if (lurl.endsWith('.pdf')) {
+  // PDFs: render in embedded pdf.js viewer (skip if already a viewer URL)
+  if (lurl.endsWith('.pdf') && !url.startsWith('/static/pdfjs/')) {
     url = _pdfViewerUrl(url);
   }
   readerOpen = true;
@@ -3883,12 +3884,12 @@ function openArticle(zim, path) {
   // Track article history: push current article before navigating away
   if (currentArticle) _pushArticleHistory(currentArticle.zim, currentArticle.path);
   currentArticle = { zim: zim, path: path };
+  // Push state with the original /w/ URL (not the viewer URL) so reload serves SPA shell
+  history.pushState({ mode: 'reader', zim: zim, path: path }, '', url);
   // PDF: route through pdf.js viewer (renders in reader iframe like any article)
   if (lurl.endsWith('.pdf')) {
     url = _pdfViewerUrl(url);
   }
-  // Normal article: push state and open in reader
-  history.pushState({ mode: 'reader', zim: zim, path: path }, '', url);
   openReader(url);
   var readerTitle = decodeURIComponent(path.split('/').pop() || '').replace(/_/g, ' ');
   if (readerTitle) {

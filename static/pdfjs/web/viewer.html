@@ -32,6 +32,8 @@ See https://github.com/adobe-type-tools/cmap-resources
 <script src="../build/pdf.mjs" type="module"></script>
 
     <link rel="stylesheet" href="viewer.css" />
+    <!-- Zimi: hide "Open file" button (no local filesystem in embedded context) -->
+    <style>#secondaryOpenFile { display: none !important; }</style>
 
   <script src="viewer.mjs" type="module"></script>
   </head>
