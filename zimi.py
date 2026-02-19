@@ -2810,8 +2810,10 @@ class ZimHandler(BaseHTTPRequestHandler):
 
     def _serve_favicon(self):
         if ZimHandler._favicon_data is None:
-            # Try loading full-size icon from assets directory
+            # Serve 32x32 favicon for browser tabs (not the full 256px icon)
             icon_paths = [
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "favicon.png"),
+                os.path.join(getattr(sys, '_MEIPASS', ''), "assets", "favicon.png") if getattr(sys, '_MEIPASS', None) else "",
                 os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon.png"),
                 os.path.join(getattr(sys, '_MEIPASS', ''), "assets", "icon.png") if getattr(sys, '_MEIPASS', None) else "",
             ]

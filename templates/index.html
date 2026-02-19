@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Zimi</title>
-<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="apple-touch-icon-precomposed" sizes="180x180" href="/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1228,7 +1228,7 @@ function _navigateHistoryItem(el) {
   articleHistory.splice(idx);
   _hideHistoryTrail();
   currentArticle = null;
-  openArticle(target.zim, target.path);
+  openArticle(target.zim, target.path, target.title);
   return true;
 }
 
@@ -1720,7 +1720,7 @@ async function renderSource(name) {
       output.innerHTML = '<div class="cat-heading">' + esc(String(data.count)) + ' Documents</div>' +
         '<div class="results">' + data.documents.map((d, i) => {
           const hasPath = !!d.path;
-          const clickAttr = hasPath ? ' onclick="openArticle(\'' + escJs(name) + '\', \'' + escJs(d.path) + '\')" onkeydown="if(event.key===\'Enter\')openArticle(\'' + escJs(name) + '\', \'' + escJs(d.path) + '\')"' : '';
+          const clickAttr = hasPath ? ' onclick="openArticle(\'' + escJs(name) + '\', \'' + escJs(d.path) + '\', \'' + escJs(d.title || '') + '\')" onkeydown="if(event.key===\'Enter\')openArticle(\'' + escJs(name) + '\', \'' + escJs(d.path) + '\', \'' + escJs(d.title || '') + '\')"' : '';
           return '<div class="result"' + (hasPath ? ' tabindex="0" role="button"' : '') + ' style="animation-delay:' + (i * 0.04) + 's"' + clickAttr + '>' +
             '<div class="title">' + esc(d.title) + '</div>' +
             (d.description ? '<div class="snippet">' + esc(d.description) + '</div>' : '') +
@@ -2032,7 +2032,7 @@ function renderSearchResults(data, scope) {
       ? '<div class="result-source">' + _sourceIconHtml(r.zim, 20) +
         '<span class="rs-name">' + esc(_zimTitle(r.zim)) + '</span></div>'
       : '';
-    return '<div class="result" tabindex="0" role="button" data-zim="' + escAttr(r.zim) + '" data-path="' + escAttr(r.path) + '" style="animation-delay:' + (Math.min(i, 5) * 0.04) + 's" onclick="openArticle(\'' + escJs(r.zim) + '\', \'' + escJs(r.path) + '\')" onkeydown="if(event.key===\'Enter\')openArticle(\'' + escJs(r.zim) + '\', \'' + escJs(r.path) + '\')">' +
+    return '<div class="result" tabindex="0" role="button" data-zim="' + escAttr(r.zim) + '" data-path="' + escAttr(r.path) + '" style="animation-delay:' + (Math.min(i, 5) * 0.04) + 's" onclick="openArticle(\'' + escJs(r.zim) + '\', \'' + escJs(r.path) + '\', \'' + escJs(r.title || '') + '\')" onkeydown="if(event.key===\'Enter\')openArticle(\'' + escJs(r.zim) + '\', \'' + escJs(r.path) + '\', \'' + escJs(r.title || '') + '\')">' +
       sourceRow +
       '<div class="title">' + esc(r.title) + '</div>' +
       (r.snippet ? '<div class="snippet">' + esc(r.snippet) + '</div>' : '<div class="snippet" data-needs-snippet="1"></div>') +
@@ -2216,7 +2216,7 @@ function selectSuggest(i) {
   if (!s) return;
   hideSuggest();
   q.value = s.title;
-  openArticle(s.zim, s.path);
+  openArticle(s.zim, s.path, s.title);
 }
 
 // ── Library Manager ──
@@ -3907,7 +3907,7 @@ function _pushArticleHistory(zim, path) {
   if (articleHistory.length > 50) articleHistory.shift();
 }
 
-function openArticle(zim, path) {
+function openArticle(zim, path, title) {
   var url = _articleUrl(zim, path);
   readerSource = zim;
   // EPUB: download (Gutenberg has HTML equivalents for all EPUBs)
@@ -3929,7 +3929,9 @@ function openArticle(zim, path) {
     url = _pdfViewerUrl(url);
   }
   openReader(url);
-  var readerTitle = _titleFromPath(path);
+  // Use explicit title if provided (e.g. from catalog or search results),
+  // fall back to deriving from the URL path segment
+  var readerTitle = title || _titleFromPath(path);
   if (readerTitle) {
     var t2 = readerTitle + ' — Zimi';
     document.title = t2;
@@ -3963,7 +3965,7 @@ async function randomArticle(event) {
   try {
     const res = await fetch('/random' + zimParam);
     const data = await res.json();
-    if (!data.error) { openArticle(data.zim, data.path); return; }
+    if (!data.error) { openArticle(data.zim, data.path, data.title); return; }
     // Fallback for zimgit/PDF ZIMs: pick random doc from catalog
     if (currentSource) {
       const catRes = await fetch('/catalog?zim=' + encodeURIComponent(currentSource));
@@ -3972,7 +3974,7 @@ async function randomArticle(event) {
         const docs = catData.documents.filter(d => d.path);
         if (docs.length) {
           const pick = docs[Math.floor(Math.random() * docs.length)];
-          openArticle(currentSource, pick.path);
+          openArticle(currentSource, pick.path, pick.title);
           return;
         }
       }

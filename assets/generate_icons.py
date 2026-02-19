@@ -229,6 +229,12 @@ def main():
     icon_256.save(png_path)
     print(f"  Created {png_path}")
 
+    # Favicon (32x32 PNG for browser tabs)
+    favicon_path = os.path.join(HERE, "favicon.png")
+    icon_32 = icon.resize((32, 32), Image.LANCZOS)
+    icon_32.save(favicon_path)
+    print(f"  Created {favicon_path}")
+
     # ICO (Windows) — multi-size
     ico_path = os.path.join(HERE, "icon.ico")
     sizes = [16, 32, 48, 64, 128, 256]
