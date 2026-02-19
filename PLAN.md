@@ -75,37 +75,18 @@ Progressive search, SQLite title index, collections. See git tag v1.2.0.
 - [x] Docker image deployed to NAS, verified
 - [x] Fresh screenshots from NAS
 - [x] Desktop UI works via `python3 zimi_desktop.py`
-- [ ] Desktop packaged builds — NOT shipped yet, see v1.3.1 below
-
-## v1.3.1 — Desktop App Packaging (next)
-**Goal:** Ship working, signed desktop downloads (.dmg, .exe, .tar.gz)
-
-### macOS code signing + notarization
-- [ ] Export Developer ID Application certificate as .p12
-- [ ] Add GitHub secrets: `APPLE_CERTIFICATE_BASE64`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_TEAM_ID`, `APPLE_ID`, `APPLE_APP_PASSWORD`
-- [ ] Add codesign step to workflow (sign all .dylib + .so + executable)
-- [ ] Add notarytool step (submit, wait, staple)
-- [ ] Test: download DMG, double-click, no Gatekeeper warning
-- [ ] Ships two DMGs: `Zimi-AppleSilicon.dmg` + `Zimi-Intel.dmg`
-- [x] DMG with Applications shortcut (create-dmg --app-drop-link)
-
-### Windows fix
-- [x] Remove incorrect libzim hidden imports (stubs, not real modules)
-- [x] Add collect_libzim_binaries() for explicit native DLL bundling
-- [x] Flatten _internal/ folder (contents_directory='.')
-- [ ] Test .exe build launches and runs on clean Windows machine
-- [ ] Consider Windows code signing (optional, suppresses SmartScreen)
-
-### Linux
-- [ ] Verify tar.gz build launches on clean Ubuntu/Debian
-- [ ] Consider .AppImage packaging
-
-### Workflow
-- [ ] All iteration on v1.3 branch (NOT main)
-- [ ] PR to main only after all platforms verified
-- [ ] Tag v1.3.1, attach assets to new release
+- [x] macOS DMGs: signed, notarized, tested (Apple Silicon + Intel)
+- [x] SSL fix: certifi CA bundle for PyInstaller HTTPS
+- [x] README polished, release notes updated
+- [x] Merged to main, v1.3 branch deleted
 
 ## v1.4 — Backlog / Ideas
+
+### Windows + Linux desktop packaging
+- [ ] Windows: proper NSIS/WiX installer (bundles .NET runtime correctly)
+- [ ] Windows: code signing certificate (suppresses SmartScreen)
+- [ ] Linux: verify tar.gz or .AppImage on clean Ubuntu/Debian
+- [ ] Test all platforms end-to-end before shipping
 
 ### Built-in document viewers
 - [ ] Embed pdf.js for native PDF rendering in reader iframe (no system viewer needed)
