@@ -7,6 +7,7 @@ WORKDIR /app
 COPY zimi.py zimi_mcp.py ./
 COPY templates/ ./templates/
 COPY assets/ ./assets/
+COPY static/ ./static/
 
 RUN useradd -m -u 1000 zimi && chown -R zimi:zimi /app
 USER zimi

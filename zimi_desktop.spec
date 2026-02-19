@@ -61,6 +61,7 @@ a = Analysis(
     datas=[
         ('templates', 'templates'),
         ('assets', 'assets'),
+        ('static', 'static'),
     ],
     hiddenimports=[
         'zimi',
@@ -124,7 +125,7 @@ if platform.system() == 'Darwin':
         icon='assets/icon.icns',
         bundle_identifier='io.zosia.zimi',
         info_plist={
-            'CFBundleShortVersionString': '1.3.0',
+            'CFBundleShortVersionString': '1.4.0',
             'LSUIElement': False,  # show in Dock (native window app)
             'NSLocalNetworkUsageDescription': 'Zimi runs a local server on this computer to display your offline library. It does not access other devices.',
             'NSAppTransportSecurity': {

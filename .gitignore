@@ -10,6 +10,6 @@ PLAN.md
 CLAUDE.md
 .claude/*.local.md
 .playwright-mcp/
-build/
-dist/
+/build/
+/dist/
 *.spec.bak

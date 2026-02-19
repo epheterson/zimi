@@ -73,7 +73,7 @@ except ImportError:
 # SSL context using certifi CA bundle (PyInstaller bundles lack system certs)
 SSL_CTX = ssl.create_default_context(cafile=certifi.where())
 
-ZIMI_VERSION = "1.3.0"
+ZIMI_VERSION = "1.4.0"
 
 log = logging.getLogger("zimi")
 logging.basicConfig(format="%(asctime)s %(message)s", datefmt="%H:%M:%S", level=logging.INFO)
@@ -385,13 +385,15 @@ def _suggest_cache_clear():
 # MIME type fallback for ZIM entries with empty mimetype
 MIME_FALLBACK = {
     ".html": "text/html", ".htm": "text/html", ".css": "text/css",
-    ".js": "application/javascript", ".json": "application/json",
+    ".js": "application/javascript", ".mjs": "application/javascript", ".json": "application/json",
     ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
     ".gif": "image/gif", ".svg": "image/svg+xml", ".webp": "image/webp",
     ".ico": "image/x-icon", ".pdf": "application/pdf",
     ".woff": "font/woff", ".woff2": "font/woff2", ".ttf": "font/ttf",
     ".eot": "application/vnd.ms-fontobject", ".otf": "font/otf",
     ".xml": "application/xml", ".txt": "text/plain",
+    ".wasm": "application/wasm", ".bcmap": "application/octet-stream",
+    ".properties": "text/plain",
 }
 
 # MIME types that benefit from gzip (text-based, not already compressed)
@@ -2307,6 +2309,9 @@ class ZimHandler(BaseHTTPRequestHandler):
                 else:
                     return self._json(404, {"error": "not found"})
 
+            elif parsed.path.startswith("/static/"):
+                return self._serve_static(parsed.path[8:])  # strip "/static/"
+
             elif parsed.path in ("/favicon.ico", "/favicon.png"):
                 return self._serve_favicon()
 
@@ -2738,6 +2743,73 @@ class ZimHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body_bytes)))
         self.end_headers()
         self.wfile.write(body_bytes)
+
+    # ── Static file serving ──
+    # In-memory cache for static files (vendor files like pdf.js are immutable)
+    _static_cache = {}
+
+    @staticmethod
+    def _static_base_dir():
+        """Resolve the static/ directory, checking PyInstaller bundle first."""
+        candidates = [
+            os.path.join(getattr(sys, '_MEIPASS', ''), "static") if getattr(sys, '_MEIPASS', None) else "",
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "static"),
+        ]
+        for d in candidates:
+            if d and os.path.isdir(d):
+                return d
+        return None
+
+    def _serve_static(self, rel_path):
+        """Serve a file from the static/ directory with caching and security."""
+        # Path traversal protection
+        if not rel_path or ".." in rel_path.split("/"):
+            return self._json(400, {"error": "invalid path"})
+        # Normalize and reject absolute paths
+        rel_path = rel_path.lstrip("/")
+        if os.path.isabs(rel_path):
+            return self._json(400, {"error": "invalid path"})
+
+        # Check cache first
+        cached = ZimHandler._static_cache.get(rel_path)
+        if cached:
+            body, content_type = cached
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "public, max-age=31536000, immutable")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        base = ZimHandler._static_base_dir()
+        if not base:
+            return self._json(404, {"error": "static directory not found"})
+
+        file_path = os.path.normpath(os.path.join(base, rel_path))
+        # Ensure resolved path is still inside the static dir
+        if not file_path.startswith(os.path.normpath(base) + os.sep) and file_path != os.path.normpath(base):
+            return self._json(403, {"error": "forbidden"})
+        if not os.path.isfile(file_path):
+            return self._json(404, {"error": "not found"})
+
+        ext = os.path.splitext(file_path)[1].lower()
+        content_type = MIME_FALLBACK.get(ext, "application/octet-stream")
+
+        with open(file_path, "rb") as f:
+            body = f.read()
+
+        # Cache all static files in memory (vendor files are immutable)
+        ZimHandler._static_cache[rel_path] = (body, content_type)
+
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "public, max-age=31536000, immutable")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(body)
 
     _favicon_data = None
 
