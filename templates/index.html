@@ -3794,7 +3794,7 @@ function _pdfViewerUrl(pdfUrl) {
   // pdf.js fetches via XHR (Sec-Fetch-Dest: empty) so the server serves raw
   // PDF content without needing ?raw=1. Don't encodeURIComponent — the URL is
   // already properly percent-encoded and double-encoding breaks pdf.js.
-  return '/static/pdfjs/web/viewer.html?v=2&file=' + pdfUrl;
+  return '/static/pdfjs/web/viewer.html?file=' + pdfUrl;
 }
 
 // ── Reader ──
@@ -3867,8 +3867,9 @@ function openReader(url) {
         }
       });
     } catch(e) { /* cross-origin — ZIM content loaded from a different origin */ }
-    // Update document/window title from iframe content
-    try {
+    // Update document/window title from iframe content (skip for pdf.js — it reports
+    // "PDF.js viewer" which overwrites the good title already set by openArticle)
+    if (!_frameLoc.startsWith('/static/')) try {
       var iTitle = frame.contentDocument && frame.contentDocument.title;
       if (!iTitle) {
         // Fallback: extract from iframe URL path
