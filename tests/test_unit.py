@@ -2,9 +2,9 @@
 """Zimi tests — functionality and performance.
 
 Usage:
-  python3 tests.py                    # Run all unit tests (no ZIM files needed)
-  python3 tests.py --perf             # Run performance tests (requires running server)
-  python3 tests.py --perf-host HOST   # Performance tests against specific host
+  python3 tests/test_unit.py                    # Run all unit tests (no ZIM files needed)
+  python3 tests/test_unit.py --perf             # Run performance tests (requires running server)
+  python3 tests/test_unit.py --perf-host HOST   # Performance tests against specific host
 
 Unit tests cover pure logic functions (scoring, caching, query cleaning, etc.)
 Performance tests hit the HTTP API and measure response times.
@@ -17,8 +17,8 @@ import json
 import unittest
 from unittest.mock import patch, MagicMock
 
-# Make zimi importable
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Make zimi importable from repo root
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 # ── Unit Tests (no ZIM files needed) ──

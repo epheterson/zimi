@@ -3,7 +3,7 @@
 ## Pre-release
 
 - [ ] All changes on a feature branch (e.g. `v1.4`), NOT on `main`
-- [ ] Unit tests pass: `python3 tests.py`
+- [ ] Unit tests pass: `python3 tests/test_unit.py`
 - [ ] Integration tests pass: `python3 -m pytest tests/test_server.py -v`
 - [ ] README updated (features, endpoints, screenshots)
 - [ ] Deployed and verified on NAS
