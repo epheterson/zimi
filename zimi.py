@@ -2332,11 +2332,15 @@ class ZimHandler(BaseHTTPRequestHandler):
                     entry_path = unquote(rest[slash + 1:])
                 # Top-level browser navigation (reload/bookmark) → serve SPA shell
                 # so client-side router can handle the deep link.
-                # ?raw=1 bypasses SPA shell (used for PDF new-tab opening to avoid loops).
+                # ?raw=1 bypasses SPA shell (used for PDF new-tab opening).
+                # ?view=1 forces SPA shell (used in pushState URLs for PDFs so CDN
+                # caching of the raw PDF doesn't break reload).
+                qs = parse_qs(parsed.query)
+                is_raw = "raw" in qs
+                is_view = "view" in qs
                 fetch_dest = self.headers.get("Sec-Fetch-Dest", "")
-                is_raw = "raw" in parse_qs(parsed.query)
-                if (fetch_dest == "document" or not entry_path) and not is_raw and not entry_path.lower().endswith(".epub"):
-                    return self._serve_index()
+                if is_view or ((fetch_dest == "document" or not entry_path) and not is_raw and not entry_path.lower().endswith(".epub")):
+                    return self._serve_index(vary="Sec-Fetch-Dest")
                 # Track iframe article loads
                 if fetch_dest == "iframe":
                     _record_usage("iframe", zim_name)
@@ -2694,6 +2698,7 @@ class ZimHandler(BaseHTTPRequestHandler):
 
         self.send_header("Content-Type", mimetype)
         self.send_header("Cache-Control", "public, max-age=86400, immutable")
+        self.send_header("Vary", "Sec-Fetch-Dest")
         self.send_header("ETag", etag)
 
         if is_streamable:
@@ -2733,10 +2738,12 @@ class ZimHandler(BaseHTTPRequestHandler):
             return None, None
         return start, end
 
-    def _send(self, code, body_bytes, content_type):
+    def _send(self, code, body_bytes, content_type, vary=None):
         self.send_response(code)
         self.send_header("Content-Type", content_type)
         self.send_header("Access-Control-Allow-Origin", "*")
+        if vary:
+            self.send_header("Vary", vary)
         if self._accepts_gzip() and len(body_bytes) > 256:
             body_bytes = gzip.compress(body_bytes, compresslevel=4)
             self.send_header("Content-Encoding", "gzip")
@@ -2863,11 +2870,11 @@ class ZimHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(ZimHandler._apple_touch_icon_data)
 
-    def _serve_index(self):
-        return self._html(200, SEARCH_UI_HTML)
+    def _serve_index(self, vary=None):
+        return self._html(200, SEARCH_UI_HTML, vary=vary)
 
-    def _html(self, code, content):
-        self._send(code, content.encode(), "text/html; charset=utf-8")
+    def _html(self, code, content, vary=None):
+        self._send(code, content.encode(), "text/html; charset=utf-8", vary=vary)
 
     def _json(self, code, data):
         self._send(code, json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode(), "application/json")

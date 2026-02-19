@@ -3911,8 +3911,10 @@ function openArticle(zim, path) {
   // Track article history: push current article before navigating away
   if (currentArticle) _pushArticleHistory(currentArticle.zim, currentArticle.path);
   currentArticle = { zim: zim, path: path };
-  // Push state with the original /w/ URL (not the viewer URL) so reload serves SPA shell
-  history.pushState({ mode: 'reader', zim: zim, path: path }, '', url);
+  // Push state with the original /w/ URL (not the viewer URL) so reload serves SPA shell.
+  // PDFs get ?view=1 so CDN caches don't serve raw PDF binary on reload.
+  var pushUrl = lurl.endsWith('.pdf') ? url + (url.includes('?') ? '&' : '?') + 'view=1' : url;
+  history.pushState({ mode: 'reader', zim: zim, path: path }, '', pushUrl);
   // PDF: route through pdf.js viewer (renders in reader iframe like any article)
   if (lurl.endsWith('.pdf')) {
     url = _pdfViewerUrl(url);
