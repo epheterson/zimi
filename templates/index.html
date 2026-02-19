@@ -3794,7 +3794,7 @@ function _pdfViewerUrl(pdfUrl) {
   // pdf.js fetches via XHR (Sec-Fetch-Dest: empty) so the server serves raw
   // PDF content without needing ?raw=1. Don't encodeURIComponent — the URL is
   // already properly percent-encoded and double-encoding breaks pdf.js.
-  return '/static/pdfjs/web/viewer.html?file=' + pdfUrl;
+  return '/static/pdfjs/web/viewer.html?v=2&file=' + pdfUrl;
 }
 
 // ── Reader ──
