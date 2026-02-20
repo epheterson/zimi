@@ -4158,7 +4158,7 @@ window.addEventListener('popstate', (e) => {
 function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 function escAttr(s) { return esc(s).replace(/'/g, '&#39;').replace(/"/g, '&quot;'); }
 // Escape for JS string literal inside HTML onclick attribute (survives HTML decode then JS parse)
-function escJs(s) { return (s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+function escJs(s) { return (s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
 
 // ── Desktop app integration (pywebview) ──
 // pywebview injects window.pywebview AFTER page load, so we can't check at parse time.
