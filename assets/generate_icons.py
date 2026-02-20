@@ -191,6 +191,38 @@ def create_icon(size=1024):
     return img
 
 
+def create_favicon(size=32):
+    """Create favicon — gradient Z on solid dark background, no padding or rounded corners.
+
+    Browser tab favicons are tiny (16-32px). The macOS-style padding and rounded
+    corners waste pixels at this size, making the Z unreadable. Instead, fill the
+    entire square with the dark background and render the Z as large as possible.
+    """
+    img = Image.new("RGBA", (size, size), BG_DARK + (255,))
+    draw = ImageDraw.Draw(img)
+
+    # Render Z glyph — use entire canvas (no padding)
+    font_size = int(size * 0.75)
+    mask = None
+    if platform.system() == "Darwin":
+        mask = _render_z_mask_coretext(size, font_size)
+    if mask is None:
+        mask = _render_z_mask_pillow(size, font_size)
+
+    # Apply gradient to Z mask
+    gradient = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    grad_pixels = gradient.load()
+    for y in range(size):
+        for x in range(size):
+            alpha = mask.getpixel((x, y))
+            if alpha > 0:
+                color = _gradient_at(x, y, size, GRADIENT_COLORS)
+                grad_pixels[x, y] = (*color, alpha)
+
+    img = Image.alpha_composite(img, gradient)
+    return img
+
+
 def save_icns_with_iconutil(icon, icns_path):
     """Use macOS iconutil for proper .icns with all required sizes."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -229,10 +261,10 @@ def main():
     icon_256.save(png_path)
     print(f"  Created {png_path}")
 
-    # Favicon (32x32 PNG for browser tabs)
+    # Favicon (32x32 PNG for browser tabs — no padding, no rounded corners)
     favicon_path = os.path.join(HERE, "favicon.png")
-    icon_32 = icon.resize((32, 32), Image.LANCZOS)
-    icon_32.save(favicon_path)
+    favicon = create_favicon(32)
+    favicon.save(favicon_path)
     print(f"  Created {favicon_path}")
 
     # ICO (Windows) — multi-size
