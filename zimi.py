@@ -2828,11 +2828,21 @@ class ZimHandler(BaseHTTPRequestHandler):
             # Cache in memory (vendor files are immutable, ~8MB total for pdf.js)
             ZimHandler._static_cache[rel_path] = (body, content_type)
 
+        # Compress text-based static files (viewer.mjs, viewer.css, etc.)
+        ct_base = content_type.split(";")[0]
+        compressible = any(ct_base.startswith(t) or ct_base == t for t in COMPRESSIBLE_TYPES)
+        if self._accepts_gzip() and compressible and len(body) > 256:
+            body = gzip.compress(body, compresslevel=4)
+            is_gzipped = True
+        else:
+            is_gzipped = False
         self.send_response(200)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "public, max-age=31536000, immutable")
         self.send_header("Access-Control-Allow-Origin", "*")
+        if is_gzipped:
+            self.send_header("Content-Encoding", "gzip")
         self.end_headers()
         self.wfile.write(body)
 
