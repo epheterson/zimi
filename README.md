@@ -31,36 +31,35 @@ Search and read 100M+ articles offline. Wikipedia, Stack Overflow, dev docs, Wik
 
 ## Install
 
+### macOS
+
+```bash
+brew tap epheterson/zimi && brew install --cask zimi
+```
+
+Or download directly from [GitHub Releases](https://github.com/epheterson/Zimi/releases) — Apple Silicon and Intel DMGs, signed and notarized.
+
+### Linux
+
+```bash
+sudo snap install zimi
+```
+
+Or download the [AppImage](https://github.com/epheterson/Zimi/releases).
+
 ### Docker
 
 ```bash
-docker run -v /path/to/zims:/zims -p 8899:8899 epheterson/zimi
+docker run -v ./zims:/zims -p 8899:8899 epheterson/zimi
 ```
 
-Starting fresh? Run with an empty directory — browse and download ZIMs from the built-in catalog:
+Open http://localhost:8899. Starting fresh? Browse and download ZIMs from the built-in catalog.
+
+### Python (any platform)
 
 ```bash
-mkdir zims && docker run -v ./zims:/zims -p 8899:8899 epheterson/zimi
-```
-
-Open http://localhost:8899, click the gear icon, and browse the Kiwix catalog.
-
-### macOS Desktop App
-
-**Homebrew:**
-
-```bash
-brew tap epheterson/zimi
-brew install --cask zimi
-```
-
-**Direct download:** [GitHub Releases](https://github.com/epheterson/Zimi/releases) — Apple Silicon and Intel DMGs, signed and notarized.
-
-### Python
-
-```bash
-pip install -r requirements.txt
-python3 zimi.py serve --port 8899
+pip install zimi
+zimi serve --port 8899
 ```
 
 ## API
@@ -102,7 +101,7 @@ Zimi includes an MCP server for AI agents like Claude Code.
   "mcpServers": {
     "zimi": {
       "command": "python3",
-      "args": ["/path/to/zimi_mcp.py"],
+      "args": ["-m", "zimi.mcp_server"],
       "env": { "ZIM_DIR": "/path/to/zims" }
     }
   }
@@ -116,7 +115,7 @@ For Docker on a remote host, use SSH:
   "mcpServers": {
     "zimi": {
       "command": "ssh",
-      "args": ["your-server", "docker", "exec", "-i", "zimi", "python3", "/app/zimi_mcp.py"]
+      "args": ["your-server", "docker", "exec", "-i", "zimi", "python3", "-m", "zimi.mcp_server"]
     }
   }
 }

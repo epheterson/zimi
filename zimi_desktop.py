@@ -35,9 +35,11 @@ if platform.system() == "Windows":
 def _icon_path():
     """Find the app icon, handling both dev and PyInstaller bundle paths."""
     if getattr(sys, '_MEIPASS', None):
-        base = sys._MEIPASS
+        # PyInstaller bundle: assets are at _MEIPASS/zimi/assets/
+        base = os.path.join(sys._MEIPASS, "zimi")
     else:
-        base = os.path.dirname(os.path.abspath(__file__))
+        # Dev mode: assets are in the zimi/ package directory
+        base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "zimi")
     png = os.path.join(base, "assets", "icon.png")
     return png if os.path.exists(png) else None
 
@@ -119,7 +121,7 @@ def _find_open_port(start=8899, end=8910):
 
 
 class ServerThread(threading.Thread):
-    """Starts zimi.py serve in a background thread."""
+    """Starts the Zimi server in a background thread."""
 
     def __init__(self, zim_dir, port):
         super().__init__(daemon=True)

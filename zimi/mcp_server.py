@@ -6,7 +6,7 @@ Provides search, read, suggest, list, and random tools over ZIM files
 via the Model Context Protocol (stdio transport).
 
 Usage:
-  python3 zimi_mcp.py
+  python3 -m zimi.mcp_server
 
 Configuration:
   ZIM_DIR    Path to directory containing *.zim files (default: /zims)
@@ -16,7 +16,7 @@ Claude Code config (local):
     "mcpServers": {
       "zimi": {
         "command": "python3",
-        "args": ["/path/to/zimi_mcp.py"],
+        "args": ["-m", "zimi.mcp_server"],
         "env": { "ZIM_DIR": "/path/to/zims" }
       }
     }
@@ -27,21 +27,15 @@ Claude Code config (Docker via SSH):
     "mcpServers": {
       "zimi": {
         "command": "ssh",
-        "args": ["your-server", "docker", "exec", "-i", "zimi", "python3", "/app/zimi_mcp.py"]
+        "args": ["your-server", "docker", "exec", "-i", "zimi", "python3", "-m", "zimi.mcp_server"]
       }
     }
   }
 """
 
-import sys
-import os
-
-# Ensure zimi.py is importable from the same directory
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
 from mcp.server.fastmcp import FastMCP
 
-import zimi
+from zimi import server as zimi
 
 # Initialize: load ZIM metadata (uses persistent cache for instant startup)
 zimi.load_cache()

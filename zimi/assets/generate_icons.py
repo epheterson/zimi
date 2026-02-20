@@ -3,7 +3,7 @@
 
 Run once to create icon.png, icon.ico, and icon.icns:
     pip install Pillow
-    python assets/generate_icons.py
+    python zimi/assets/generate_icons.py
 
 Requires: Pillow. On macOS, uses CoreText for pixel-perfect system font rendering.
 On other platforms, falls back to Pillow font rendering.

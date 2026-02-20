@@ -47,7 +47,7 @@ When QA passes:
 
 - [ ] Verify Docker Hub image: `docker pull epheterson/zimi:latest`
 - [ ] Update PLAN.md (mark release complete, start next version section)
-- [ ] Sync to vault: `cp zimi.py ~/vault/infra/zim-reader/ && cp templates/index.html ~/vault/infra/zim-reader/templates/`
+- [ ] Sync to vault: `cp zimi/server.py ~/vault/infra/zim-reader/zimi/ && cp zimi/templates/index.html ~/vault/infra/zim-reader/zimi/templates/`
 
 ## Desktop App Build
 
@@ -61,8 +61,8 @@ pip install -r requirements-desktop.txt
 ### Generate icons (if changed)
 
 ```bash
-python assets/generate_icons.py
-# Creates: assets/icon.png, assets/icon.ico, assets/icon.icns
+python zimi/assets/generate_icons.py
+# Creates: zimi/assets/icon.png, zimi/assets/icon.ico, zimi/assets/icon.icns
 # Requires: Pillow. Uses SF Compact Black on macOS for the Z glyph.
 ```
 
@@ -145,7 +145,7 @@ Requires an Apple Developer account ($99/yr). One-time setup:
 
 - `dist/` and `build/` are gitignored — never commit build artifacts
 - PyInstaller COPY's source at build time — rebuild after code changes
-- The `.spec` file includes `templates/` and `assets/` as data files
+- The `.spec` file includes `zimi/templates/`, `zimi/assets/`, and `zimi/static/` as data files
 - macOS: the BUNDLE section creates the `.app` with proper `Info.plist` (CFBundleName=Zimi, icon, bundle ID)
 - The `_set_macos_app_identity()` function in `zimi_desktop.py` is a fallback for dev mode (`python zimi_desktop.py`) but the proper .app build handles Dock icon/name natively via Info.plist
 - Windows build needs a Windows machine or VM (cross-compilation not supported by PyInstaller)

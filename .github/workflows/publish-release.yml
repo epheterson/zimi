@@ -1,7 +1,7 @@
 name: Post-Publish
 
 # Triggered when a draft release is manually published.
-# Updates the Sparkle appcast and Homebrew cask with new version info.
+# Updates the Sparkle appcast, Homebrew cask, and publishes to PyPI.
 
 on:
   release:
@@ -11,6 +11,19 @@ permissions:
   contents: write
 
 jobs:
+  publish-pypi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install build twine
+      - run: python -m build
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
   update-appcast:
     runs-on: macos-latest
     steps:
@@ -168,3 +181,22 @@ jobs:
           git diff --cached --quiet && echo "No changes" && exit 0
           git commit -m "Update Zimi to ${{ env.VNUM }}"
           git push
+
+  publish-snap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Snap from release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          gh release download "$VERSION" --repo epheterson/Zimi --pattern "*.snap" || true
+
+      - name: Publish to Snap Store
+        if: hashFiles('*.snap') != ''
+        uses: snapcore/action-publish@v1
+        with:
+          snap: "*.snap"
+          release: stable
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_TOKEN }}

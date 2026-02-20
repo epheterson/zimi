@@ -13,13 +13,13 @@ Configuration:
   ZIMI_MANAGE  Set to "1" to enable library management endpoints
 
 Usage (CLI):
-  python3 zimi.py search "water purification" --limit 10
-  python3 zimi.py read stackoverflow "Questions/12345"
-  python3 zimi.py list
-  python3 zimi.py suggest "pytho"
+  zimi search "water purification" --limit 10
+  zimi read stackoverflow "Questions/12345"
+  zimi list
+  zimi suggest "pytho"
 
 Usage (HTTP API):
-  python3 zimi.py serve --port 8899
+  zimi serve --port 8899
 
   GET /search?q=...&limit=5&zim=...   Full-text search (cross-ZIM or scoped)
   GET /read?zim=...&path=...           Read article as plaintext

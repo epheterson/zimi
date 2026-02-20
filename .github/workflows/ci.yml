@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "v*"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install package
+        run: pip install -e ".[pdf]" pytest
+
+      - name: Run unit tests
+        run: python -m pytest tests/test_unit.py -v
+
+      - name: Run integration tests
+        run: python -m pytest tests/test_server.py -v
+
+      - name: Verify CLI entry point
+        run: zimi --help
+
+      - name: Verify python -m zimi
+        run: python -m zimi --help
+
+      - name: Verify package build
+        run: |
+          pip install build
+          python -m build
+          # Check wheel contains data files
+          python -c "
+          import zipfile, sys
+          whl = [f for f in __import__('glob').glob('dist/*.whl')][0]
+          with zipfile.ZipFile(whl) as z:
+              names = z.namelist()
+              assert any('templates/index.html' in n for n in names), 'Missing templates'
+              assert any('static/pdfjs' in n for n in names), 'Missing static/pdfjs'
+              assert any('assets/icon.png' in n for n in names), 'Missing assets'
+              print(f'Wheel OK: {len(names)} files')
+          "
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker compose build
+
+      - name: Smoke test Docker
+        run: |
+          TMPZIM=$(mktemp -d)
+          docker run --rm -d --name zimi-test -v "$TMPZIM:/zims" -p 8899:8899 -e ZIMI_MANAGE=1 zimi-zimi
+
+          # Wait for server
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8899/health > /dev/null 2>&1; then break; fi
+            sleep 1
+          done
+
+          echo "Testing /health..."
+          curl -sf http://localhost:8899/health | python3 -c "import sys,json; d=json.load(sys.stdin); assert d['status']=='ok'; print(f'  OK: v{d[\"version\"]}')"
+
+          echo "Testing / (web UI)..."
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8899/)
+          [ "$STATUS" = "200" ] && echo "  OK" || { echo "FAIL: $STATUS"; exit 1; }
+
+          echo "Testing /static/pdfjs/web/viewer.html..."
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8899/static/pdfjs/web/viewer.html)
+          [ "$STATUS" = "200" ] && echo "  OK" || { echo "FAIL: $STATUS"; exit 1; }
+
+          echo "All Docker smoke tests passed!"
+          docker stop zimi-test
+          rm -rf "$TMPZIM"

@@ -88,7 +88,7 @@ jobs:
           echo "Sparkle.framework ready ($(du -sh Sparkle.framework | cut -f1))"
 
       - name: Generate icons
-        run: python assets/generate_icons.py
+        run: python zimi/assets/generate_icons.py
 
       - name: Inspect libzim package
         shell: bash
@@ -299,6 +299,19 @@ jobs:
 
       # ── Packaging ─────────────────────────────────────────────────────
 
+      - name: Build Snap (Linux)
+        if: runner.os == 'Linux'
+        uses: snapcore/action-build@v1
+        with:
+          snapcraft-args: '--destructive-mode'
+
+      - name: Upload Snap artifact
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zimi-Linux-snap
+          path: "*.snap"
+
       - name: Package AppImage (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -310,7 +323,7 @@ jobs:
           cp linux/AppRun "$APPDIR/"
           chmod +x "$APPDIR/AppRun"
           cp linux/zimi.desktop "$APPDIR/"
-          cp assets/icon.png "$APPDIR/zimi.png"
+          cp zimi/assets/icon.png "$APPDIR/zimi.png"
           ln -sf zimi.png "$APPDIR/.DirIcon"
 
           # Download appimagetool
@@ -470,6 +483,7 @@ jobs:
           draft: true
           files: |
             Zimi-Linux-amd64/Zimi-Linux-amd64.AppImage
+            Zimi-Linux-snap/*.snap
             Zimi-Intel/Zimi-Intel.dmg
             Zimi-AppleSilicon/Zimi-AppleSilicon.dmg
             Zimi-Windows-amd64/Zimi-Windows-amd64.zip

@@ -59,12 +59,13 @@ a = Analysis(
     pathex=[],
     binaries=libzim_bins,
     datas=[
-        ('templates', 'templates'),
-        ('assets', 'assets'),
-        ('static', 'static'),
+        ('zimi/templates', 'zimi/templates'),
+        ('zimi/assets', 'zimi/assets'),
+        ('zimi/static', 'zimi/static'),
     ],
     hiddenimports=[
         'zimi',
+        'zimi.server',
         'libzim',
         'certifi',
         'fitz',
@@ -77,7 +78,7 @@ a = Analysis(
     runtime_hooks=['rthook_pythonnet.py'],
     excludes=[
         'mcp',
-        'zimi_mcp',
+        'zimi.mcp_server',
         'matplotlib',
         'numpy',
         'scipy',
@@ -104,7 +105,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,
-    icon='assets/icon.icns' if platform.system() == 'Darwin' else 'assets/icon.ico',
+    icon='zimi/assets/icon.icns' if platform.system() == 'Darwin' else 'zimi/assets/icon.ico',
 )
 
 coll = COLLECT(
@@ -125,7 +126,7 @@ if platform.system() == 'Darwin':
     app = BUNDLE(
         coll,
         name='Zimi.app',
-        icon='assets/icon.icns',
+        icon='zimi/assets/icon.icns',
         bundle_identifier='io.zosia.zimi',
         info_plist={
             'CFBundleShortVersionString': '1.4.0',
