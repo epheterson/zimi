@@ -51,22 +51,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build Docker image
-        run: docker compose build
-
-      - name: Smoke test Docker
+      - name: Build and start Docker
         run: |
-          TMPZIM=$(mktemp -d)
-          docker run --rm -d --name zimi-test -v "$TMPZIM:/zims" -p 8899:8899 -e ZIMI_MANAGE=1 zimi-zimi
+          mkdir -p zims
+          docker compose up -d --build
 
-          # Wait for server
-          for i in $(seq 1 30); do
+          # Wait for server (up to 60s — first start can be slow)
+          for i in $(seq 1 60); do
             if curl -sf http://localhost:8899/health > /dev/null 2>&1; then break; fi
             sleep 1
           done
 
+      - name: Smoke test Docker
+        run: |
           echo "Testing /health..."
-          curl -sf http://localhost:8899/health | python3 -c "import sys,json; d=json.load(sys.stdin); assert d['status']=='ok'; print(f'  OK: v{d[\"version\"]}')"
+          curl -sf http://localhost:8899/health | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          assert d['status'] == 'ok', f'Bad status: {d}'
+          print(f'  OK: v{d[\"version\"]}')
+          "
 
           echo "Testing / (web UI)..."
           STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8899/)
@@ -77,5 +81,7 @@ jobs:
           [ "$STATUS" = "200" ] && echo "  OK" || { echo "FAIL: $STATUS"; exit 1; }
 
           echo "All Docker smoke tests passed!"
-          docker stop zimi-test
-          rm -rf "$TMPZIM"
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down
