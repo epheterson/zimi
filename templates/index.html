@@ -3906,7 +3906,10 @@ function openReader(url) {
         if (!a) return;
         var href = a.getAttribute('href') || '';
         var lhref = href.toLowerCase();
-        var fullUrl = a.href; // resolved absolute URL
+        // Resolve URL against iframe's location (not document.baseURI which may point to original domain)
+        var frameLoc = frame.contentWindow.location;
+        var fullUrl;
+        try { fullUrl = new URL(href, frameLoc.href).href; } catch(ex) { fullUrl = a.href; }
         // EPUB: download
         if (lhref.endsWith('.epub')) {
           e.preventDefault();
@@ -3924,7 +3927,7 @@ function openReader(url) {
           return;
         }
         // External links: open in new tab
-        if (/^https?:\/\//.test(fullUrl) && !fullUrl.startsWith(location.origin)) {
+        if (/^https?:\/\//.test(href) && !fullUrl.startsWith(location.origin)) {
           e.preventDefault();
           window.open(fullUrl, '_blank');
         }
