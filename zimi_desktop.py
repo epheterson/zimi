@@ -302,6 +302,15 @@ def _init_sparkle_updater():
             None,  # updaterDelegate
             None,  # userDriverDelegate
         )
+
+        # Point at architecture-specific appcast so AS users get the AS DMG
+        import platform as _plat
+        from Foundation import NSURL
+        arch = _plat.machine()  # "arm64" or "x86_64"
+        arch_suffix = "arm64" if arch == "arm64" else "intel"
+        feed_url = f"https://raw.githubusercontent.com/epheterson/Zimi/main/appcast-{arch_suffix}.xml"
+        controller.updater().setFeedURL_(NSURL.URLWithString_(feed_url))
+
         # Keep a strong reference to prevent garbage collection
         _init_sparkle_updater._controller = controller
     except Exception as e:

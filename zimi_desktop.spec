@@ -135,7 +135,8 @@ if platform.system() == 'Darwin':
             'NSAppTransportSecurity': {
                 'NSAllowsArbitraryLoads': True,  # needed for localhost HTTP
             },
-            'SUFeedURL': 'https://raw.githubusercontent.com/epheterson/Zimi/main/appcast.xml',
+            # Default appcast (Intel); overridden at runtime for Apple Silicon
+            'SUFeedURL': 'https://raw.githubusercontent.com/epheterson/Zimi/main/appcast-intel.xml',
             'SUPublicEDKey': 'YPy3VF5Yv4ajGgz3HKvkeBOqhTkZXZyoFYsLhLq9Cpc=',
         },
     )

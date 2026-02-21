@@ -373,11 +373,95 @@ jobs:
 
   release:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: macos-latest  # Need macOS for Sparkle sign_update tool
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
+
+      # ── Sparkle EdDSA signing + appcast ─────────────────────────────
+      - name: Sign DMGs and update appcast.xml
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          if [ -z "$SPARKLE_PRIVATE_KEY" ]; then
+            echo "SPARKLE_PRIVATE_KEY not set, skipping DMG signing"
+            exit 0
+          fi
+
+          # Download Sparkle tools
+          curl -sL "https://github.com/sparkle-project/Sparkle/releases/download/2.8.1/Sparkle-2.8.1.tar.xz" -o /tmp/sparkle.tar.xz
+          tar -xf /tmp/sparkle.tar.xz -C /tmp
+
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          REPO="epheterson/Zimi"
+
+          # Sign both DMGs and generate per-architecture appcasts
+          generate_appcast() {
+            local ARCH_NAME="$1" DMG_DIR="$2" DMG_ASSET="$3" OUTFILE="$4"
+            local DMG_FILE=$(ls "$DMG_DIR"/*.dmg 2>/dev/null | head -1)
+            if [ -z "$DMG_FILE" ]; then
+              echo "WARNING: No $ARCH_NAME DMG found in $DMG_DIR"
+              return 1
+            fi
+
+            echo "Signing $DMG_FILE ($ARCH_NAME)..."
+            local SIG=$(/tmp/bin/sign_update "$DMG_FILE" --ed-key-file <(echo "$SPARKLE_PRIVATE_KEY") 2>&1)
+            local ED_SIG=$(echo "$SIG" | grep -o 'sparkle:edSignature="[^"]*"' | sed 's/sparkle:edSignature="//;s/"//')
+            local LENGTH=$(echo "$SIG" | grep -o 'length="[^"]*"' | sed 's/length="//;s/"//')
+
+            if [ -z "$ED_SIG" ]; then
+              echo "ERROR: Failed to sign $ARCH_NAME DMG"
+              return 1
+            fi
+
+            cat > "$OUTFILE" << APPCAST
+          <?xml version="1.0" encoding="utf-8"?>
+          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+            <channel>
+              <title>Zimi Updates</title>
+              <link>https://github.com/${REPO}</link>
+              <description>Offline knowledge server for ZIM files</description>
+              <language>en</language>
+              <item>
+                <title>Version ${VERSION}</title>
+                <sparkle:version>${VERSION}</sparkle:version>
+                <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
+                <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+                <pubDate>$(date -R)</pubDate>
+                <enclosure
+                  url="https://github.com/${REPO}/releases/download/${TAG}/${DMG_ASSET}"
+                  length="${LENGTH}"
+                  type="application/octet-stream"
+                  sparkle:edSignature="${ED_SIG}"
+                />
+              </item>
+            </channel>
+          </rss>
+          APPCAST
+            sed -i '' 's/^          //' "$OUTFILE"
+            echo "Generated $OUTFILE:"
+            cat "$OUTFILE"
+          }
+
+          generate_appcast "Intel" "Zimi-Intel" "Zimi-Intel.dmg" "appcast-intel.xml"
+          generate_appcast "Apple Silicon" "Zimi-AppleSilicon" "Zimi-AppleSilicon.dmg" "appcast-arm64.xml"
+
+          # Commit and push to main
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add appcast-intel.xml appcast-arm64.xml
+          git diff --cached --quiet && echo "No appcast changes" || {
+            git commit -m "Update appcasts for ${TAG}"
+            git push origin main
+          }
 
       - name: Create draft release
         uses: softprops/action-gh-release@v2
