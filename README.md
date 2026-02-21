@@ -1,23 +1,16 @@
 # Zimi
 
-Search and read 100M+ articles offline. Wikipedia, Stack Overflow, dev docs, WikiHow, and thousands more — all on your machine, no internet required.
+The offline internet — searchable, browsable, and self-updating.
 
-[Kiwix](https://kiwix.org) packages the world's knowledge into [ZIM files](https://wiki.openzim.org/wiki/ZIM_file_format) — compressed offline archives of entire websites. Zimi is the fastest way to search and read them.
+Kiwix packages the world's knowledge into ZIM files — compressed offline copies of Wikipedia, Stack Overflow, dev docs, and thousands of other sites. Zimi is a modern server that makes them feel like the real thing.
 
-**Three ways to run it:**
+**What makes it different:**
 
-- **Docker** — self-host on a NAS, server, or anywhere with one command.
-- **Desktop app** (macOS) — native window with built-in catalog browser. [Download here.](https://github.com/epheterson/Zimi/releases)
-- **Python CLI** — run directly if you already have Python installed.
-
-**What you get:**
-
-- **Catalog browser** — visual gallery of 1,000+ available ZIM archives across 10 categories. One-click install.
-- **Cross-source search** — search across all your sources at once, with sub-second title matches.
-- **Article reader** — clean dark-theme reader with embedded PDF viewer and navigation history.
-- **JSON API** — every feature accessible programmatically for scripts, bots, and integrations.
-- **MCP server** — plug into Claude Code and other AI agents as a knowledge tool.
-- **Collections** — group sources into named sets for scoped search (e.g. "Dev Docs", "Medical").
+- **Cross-source search** — one query, all your sources, ranked by relevance
+- **Library management** — browse a catalog, install with one click, auto-update on a schedule
+- **JSON API** — every feature accessible programmatically for scripts, bots, and AI agents
+- **Desktop app** — native macOS window with built-in reader, PDF viewer, and navigation history
+- **Runs anywhere** — Homebrew, Snap, Docker, pip, or a standalone AppImage
 
 ## Screenshots
 
