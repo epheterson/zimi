@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Zimi Updates</title>
+    <link>https://github.com/epheterson/Zimi</link>
+    <description>Offline knowledge server for ZIM files</description>
+    <language>en</language>
+    <item>
+      <title>Version 1.4.0-rc6</title>
+      <sparkle:version>1.4.0-rc6</sparkle:version>
+      <sparkle:shortVersionString>1.4.0-rc6</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+      <pubDate>Sat, 21 Feb 2026 18:29:57 +0000</pubDate>
+      <enclosure
+        url="https://github.com/epheterson/Zimi/releases/download/v1.4.0-rc6/Zimi-AppleSilicon.dmg"
+        length="46027260"
+        type="application/octet-stream"
+        sparkle:edSignature="JDZYoEOvtSIq1qQAWlTn/n39cxGIKhS6gMf9Gq0ULjJ/QAUHRrp9d5pLOuzZX/XrjD1CV0UUBibv70ggYZTYCg=="
+      />
+    </item>
+  </channel>
+</rss>
