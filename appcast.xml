@@ -13,7 +13,7 @@
       <description><![CDATA[<h2>Test Update</h2><p>Testing Sparkle update mechanism.</p>]]></description>
       <pubDate>Thu, 20 Feb 2026 12:00:00 +0000</pubDate>
       <enclosure
-        url="https://github.com/epheterson/Zimi/releases/download/untagged-c2ecc74e3cc691008ae1/Zimi-Intel.dmg"
+        url="https://github.com/epheterson/Zimi/releases/download/v1.4.0-rc5/Zimi-Intel.dmg"
         length="48692553"
         type="application/octet-stream"
         sparkle:edSignature=""
