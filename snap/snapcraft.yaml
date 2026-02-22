@@ -1,0 +1,19 @@
+name: zimi
+base: core22
+version: '1.4.0'
+summary: Offline knowledge server for ZIM files
+description: |
+  Search and read 100M+ articles offline. Wikipedia, Stack Overflow,
+  dev docs, and thousands more — all on your machine.
+grade: stable
+confinement: strict
+
+apps:
+  zimi:
+    command: Zimi
+    plugs: [network, network-bind, home, removable-media]
+
+parts:
+  zimi:
+    plugin: dump
+    source: dist/Zimi/

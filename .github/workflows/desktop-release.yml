@@ -20,16 +20,13 @@ jobs:
         include:
           - os: ubuntu-latest
             artifact: Zimi-Linux-amd64
-            asset: Zimi-Linux-amd64.tar.gz
+            asset: Zimi-Linux-amd64.AppImage
           - os: macos-15-intel
             artifact: Zimi-Intel
             asset: Zimi-Intel.dmg
           - os: macos-latest
             artifact: Zimi-AppleSilicon
             asset: Zimi-AppleSilicon.dmg
-          - os: windows-latest
-            artifact: Zimi-Windows-amd64
-            asset: Zimi-Windows-amd64.zip
 
     runs-on: ${{ matrix.os }}
 
@@ -54,11 +51,6 @@ jobs:
             gir1.2-webkit2-4.1 \
             gcc libcairo2-dev pkg-config python3-dev
 
-      - name: Set pythonnet runtime (Windows)
-        if: runner.os == 'Windows'
-        run: echo "PYTHONNET_RUNTIME=coreclr" >> $env:GITHUB_ENV
-        shell: pwsh
-
       - name: Install dependencies
         run: pip install -r requirements-desktop.txt
 
@@ -66,8 +58,29 @@ jobs:
         if: runner.os == 'Linux'
         run: pip install PyGObject
 
+      - name: Install pytest
+        run: pip install pytest
+
+      # ── Pre-build tests ──────────────────────────────────────────────
+
+      - name: Run unit tests
+        run: python tests/test_unit.py
+
+      - name: Run integration tests
+        run: python -m pytest tests/test_server.py -v
+
+      # ── Build ─────────────────────────────────────────────────────────
+
+      - name: Download Sparkle.framework (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          curl -sL "https://github.com/sparkle-project/Sparkle/releases/download/2.8.1/Sparkle-2.8.1.tar.xz" -o /tmp/sparkle.tar.xz
+          tar -xf /tmp/sparkle.tar.xz -C /tmp
+          cp -R /tmp/Sparkle.framework Sparkle.framework
+          echo "Sparkle.framework ready ($(du -sh Sparkle.framework | cut -f1))"
+
       - name: Generate icons
-        run: python assets/generate_icons.py
+        run: python zimi/assets/generate_icons.py
 
       - name: Inspect libzim package
         shell: bash
@@ -91,50 +104,142 @@ jobs:
       - name: Build with PyInstaller
         run: pyinstaller --noconfirm zimi_desktop.spec
 
-      - name: Bundle .NET runtime (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
+      # ── Post-build smoke tests ────────────────────────────────────────
+
+      - name: Smoke test built binary (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
         run: |
-          # Find .NET runtime (6, 7, or 8 — needed by pythonnet/clr_loader)
-          $dotnetRoot = (Get-Command dotnet).Source | Split-Path
-          Write-Host "dotnet root: $dotnetRoot"
-          Write-Host "Available runtimes:"
-          dotnet --list-runtimes
-          $runtimeDir = Get-ChildItem "$dotnetRoot\shared\Microsoft.NETCore.App" -Directory |
-            Sort-Object Name -Descending | Select-Object -First 1
-          if (-not $runtimeDir) {
-            Write-Error "No .NET runtime found"
+          BINARY="dist/Zimi.app/Contents/MacOS/Zimi"
+          TMPZIM=$(mktemp -d)
+          echo "Starting Zimi with --serve --port 0 ..."
+          $BINARY --serve --port 0 --zim-dir "$TMPZIM" > /tmp/zimi_out.txt 2>&1 &
+          PID=$!
+
+          # Wait for READY message (up to 30s)
+          PORT=""
+          for i in $(seq 1 60); do
+            if grep -q "^READY " /tmp/zimi_out.txt 2>/dev/null; then
+              PORT=$(grep "^READY " /tmp/zimi_out.txt | head -1 | awk '{print $2}')
+              break
+            fi
+            sleep 0.5
+          done
+
+          if [ -z "$PORT" ]; then
+            echo "ERROR: Server did not start within 30s"
+            cat /tmp/zimi_out.txt
+            kill $PID 2>/dev/null || true
             exit 1
-          }
-          Write-Host "Bundling .NET runtime from: $dotnetRoot"
-          $dest = "dist\Zimi\_internal\dotnet_runtime"
-          # Copy shared/Microsoft.NETCore.App/{version}/ (CoreCLR runtime)
-          $sharedDest = "$dest\shared\Microsoft.NETCore.App\$($runtimeDir.Name)"
-          New-Item -ItemType Directory -Force -Path $sharedDest | Out-Null
-          Copy-Item "$($runtimeDir.FullName)\*" -Destination $sharedDest -Recurse
-          # Copy host/fxr/{version}/ (hostfxr.dll — required by clr_loader)
-          $fxrDir = Get-ChildItem "$dotnetRoot\host\fxr" -Directory |
-            Sort-Object Name -Descending | Select-Object -First 1
-          if ($fxrDir) {
-            $fxrDest = "$dest\host\fxr\$($fxrDir.Name)"
-            New-Item -ItemType Directory -Force -Path $fxrDest | Out-Null
-            Copy-Item "$($fxrDir.FullName)\*" -Destination $fxrDest -Recurse
-            Write-Host "Bundled hostfxr from: $($fxrDir.FullName)"
-          } else {
-            Write-Warning "No hostfxr directory found"
-          }
-          Write-Host "Bundled $(Get-ChildItem $dest -Recurse -File | Measure-Object | Select-Object -Expand Count) files total"
+          fi
 
-      - name: Test launch (Linux)
+          echo "Server ready on port $PORT"
+          BASE="http://127.0.0.1:$PORT"
+
+          # Hit endpoints
+          echo "Testing /health..."
+          curl -sf "$BASE/health" | python -c "import sys,json; d=json.load(sys.stdin); assert d['status']=='ok', f'Bad health: {d}'; print(f'  OK: v{d[\"version\"]}, {d[\"zim_count\"]} ZIMs')"
+
+          echo "Testing /list..."
+          curl -sf "$BASE/list" | python -c "import sys,json; d=json.load(sys.stdin); print(f'  OK: {len(d)} sources')"
+
+          echo "Testing /search..."
+          curl -sf "$BASE/search?q=test&limit=1&fast=1" | python -c "import sys,json; d=json.load(sys.stdin); assert 'results' in d; print(f'  OK: {d[\"total\"]} results')"
+
+          echo "Testing /static/pdfjs/web/viewer.html..."
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/static/pdfjs/web/viewer.html")
+          [ "$STATUS" = "200" ] && echo "  OK: pdf.js viewer" || { echo "FAIL: got $STATUS"; exit 1; }
+
+          echo "Testing /manage/status..."
+          curl -sf "$BASE/manage/status" | python -c "import sys,json; d=json.load(sys.stdin); assert 'zim_count' in d; print(f'  OK: {d[\"zim_count\"]} ZIMs, manage={d[\"manage_enabled\"]}')"
+
+          echo "Testing / (web UI)..."
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/")
+          [ "$STATUS" = "200" ] && echo "  OK: web UI" || { echo "FAIL: got $STATUS"; exit 1; }
+
+          echo "All smoke tests passed!"
+          kill $PID 2>/dev/null || true
+          rm -rf "$TMPZIM"
+
+      - name: Smoke test built binary (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          BINARY="dist/Zimi/Zimi"
+          TMPZIM=$(mktemp -d)
+          echo "Starting Zimi with --serve --port 0 ..."
+          $BINARY --serve --port 0 --zim-dir "$TMPZIM" > /tmp/zimi_out.txt 2>&1 &
+          PID=$!
+
+          PORT=""
+          for i in $(seq 1 60); do
+            if grep -q "^READY " /tmp/zimi_out.txt 2>/dev/null; then
+              PORT=$(grep "^READY " /tmp/zimi_out.txt | head -1 | awk '{print $2}')
+              break
+            fi
+            sleep 0.5
+          done
+
+          if [ -z "$PORT" ]; then
+            echo "ERROR: Server did not start within 30s"
+            cat /tmp/zimi_out.txt
+            kill $PID 2>/dev/null || true
+            exit 1
+          fi
+
+          echo "Server ready on port $PORT"
+          BASE="http://127.0.0.1:$PORT"
+
+          echo "Testing /health..."
+          curl -sf "$BASE/health" | python -c "import sys,json; d=json.load(sys.stdin); assert d['status']=='ok'; print(f'  OK: v{d[\"version\"]}')"
+
+          echo "Testing /static/pdfjs/web/viewer.html..."
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/static/pdfjs/web/viewer.html")
+          [ "$STATUS" = "200" ] && echo "  OK: pdf.js viewer" || { echo "FAIL: got $STATUS"; exit 1; }
+
+          echo "Testing / (web UI)..."
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/")
+          [ "$STATUS" = "200" ] && echo "  OK: web UI" || { echo "FAIL: got $STATUS"; exit 1; }
+
+          echo "All smoke tests passed!"
+          kill $PID 2>/dev/null || true
+          rm -rf "$TMPZIM"
+
+      # ── Packaging ─────────────────────────────────────────────────────
+
+      - name: Build Snap (Linux)
+        if: runner.os == 'Linux'
+        uses: snapcore/action-build@v1
+        with:
+          snapcraft-args: '--destructive-mode'
+
+      - name: Upload Snap artifact
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zimi-Linux-snap
+          path: "*.snap"
+
+      - name: Package AppImage (Linux)
         if: runner.os == 'Linux'
         run: |
-          timeout 10 dist/Zimi/Zimi --help 2>&1 || echo "Exit code: $?"
-          echo "Binary exists and was attempted"
+          # Build AppDir from PyInstaller output
+          APPDIR=dist/Zimi.AppDir
+          mv dist/Zimi "$APPDIR"
 
-      - name: Package (Linux)
-        if: runner.os == 'Linux'
-        working-directory: dist
-        run: tar -czf ../${{ matrix.asset }} Zimi
+          # Add AppImage metadata
+          cp linux/AppRun "$APPDIR/"
+          chmod +x "$APPDIR/AppRun"
+          cp linux/zimi.desktop "$APPDIR/"
+          cp zimi/assets/icon.png "$APPDIR/zimi.png"
+          ln -sf zimi.png "$APPDIR/.DirIcon"
+
+          # Download appimagetool
+          curl -sL "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage" -o /tmp/appimagetool
+          chmod +x /tmp/appimagetool
+
+          # Build the AppImage (--appimage-extract-and-run avoids FUSE requirement in CI)
+          ARCH=x86_64 /tmp/appimagetool --appimage-extract-and-run "$APPDIR" "${{ matrix.asset }}"
 
       - name: Install create-dmg (macOS)
         if: runner.os == 'macOS'
@@ -167,6 +272,21 @@ jobs:
 
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> $GITHUB_ENV
 
+      - name: Copy Sparkle.framework into app bundle (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          # Must copy AFTER PyInstaller — BUNDLE() overwrites dist/Zimi.app
+          FWDIR="dist/Zimi.app/Contents/Frameworks"
+          mkdir -p "$FWDIR"
+          rm -rf "$FWDIR/Sparkle.framework"
+          cp -R Sparkle.framework "$FWDIR/"
+
+          # Remove XPC services — not needed for non-sandboxed apps, and they
+          # fail to launch from inside a PyInstaller bundle ("updater failed to start")
+          rm -rf "$FWDIR/Sparkle.framework/Versions/B/XPCServices"
+          echo "Copied Sparkle.framework (XPC services removed for non-sandboxed app)"
+          ls -la "$FWDIR/Sparkle.framework/Versions/Current/Sparkle"
+
       - name: Code sign app (macOS)
         if: runner.os == 'macOS' && env.APPLE_CERTIFICATE_BASE64 != ''
         env:
@@ -176,6 +296,17 @@ jobs:
           # Use whatever signing identity is in the keychain
           IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | head -1 | sed 's/.*"\(.*\)"/\1/')
           echo "Signing with: $IDENTITY"
+
+          # Sign Sparkle.framework's nested binaries first
+          SPARKLE="dist/Zimi.app/Contents/Frameworks/Sparkle.framework"
+          if [ -d "$SPARKLE" ]; then
+            # Sign Autoupdate (XPC service inside Sparkle)
+            find "$SPARKLE" -type f \( -name "*.xpc" -o -name "Autoupdate" -o -name "Updater" \) -exec \
+              codesign --force --options runtime --sign "$IDENTITY" --timestamp {} \;
+            # Sign the framework binary itself
+            codesign --force --options runtime --sign "$IDENTITY" --timestamp "$SPARKLE/Versions/Current/Sparkle"
+            codesign --force --options runtime --sign "$IDENTITY" --timestamp "$SPARKLE"
+          fi
 
           # Sign all binaries inside the app bundle
           find dist/Zimi.app -type f \( -name "*.dylib" -o -name "*.so" -o -name "*.pyd" \) -exec \
@@ -230,24 +361,6 @@ jobs:
           done
           echo "Notarization complete"
 
-      - name: Smoke test
-        shell: bash
-        run: |
-          echo "=== Top-level contents of dist/Zimi/ ==="
-          ls -la dist/Zimi/ | head -30
-          echo ""
-          echo "=== Looking for libzim files ==="
-          find dist/Zimi/ -name "libzim*" -o -name "zim*" 2>/dev/null || true
-          echo ""
-          echo "=== Looking for python shared libs ==="
-          find dist/Zimi/ -name "python*" -type f 2>/dev/null | head -10 || true
-
-      - name: Package (Windows)
-        if: runner.os == 'Windows'
-        working-directory: dist
-        shell: pwsh
-        run: Compress-Archive -Path Zimi -DestinationPath ../${{ matrix.asset }}
-
       - name: Move asset to dist
         run: mv ${{ matrix.asset }} dist/ 2>/dev/null || true
         shell: bash
@@ -260,18 +373,161 @@ jobs:
 
   release:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: macos-latest  # Need macOS for Sparkle sign_update tool
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          # RELEASE_TOKEN is a fine-grained PAT that can push to main (bypasses branch protection)
+          token: ${{ secrets.RELEASE_TOKEN }}
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
 
-      - name: Upload to GitHub Release
+      # ── Sparkle EdDSA signing + appcast ─────────────────────────────
+      - name: Sign DMGs and update appcast.xml
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          if [ -z "$SPARKLE_PRIVATE_KEY" ]; then
+            echo "SPARKLE_PRIVATE_KEY not set, skipping DMG signing"
+            exit 0
+          fi
+
+          # Download Sparkle tools
+          curl -sL "https://github.com/sparkle-project/Sparkle/releases/download/2.8.1/Sparkle-2.8.1.tar.xz" -o /tmp/sparkle.tar.xz
+          tar -xf /tmp/sparkle.tar.xz -C /tmp
+
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          REPO="epheterson/Zimi"
+
+          # Sign both DMGs and generate per-architecture appcasts
+          generate_appcast() {
+            local ARCH_NAME="$1" DMG_DIR="$2" DMG_ASSET="$3" OUTFILE="$4"
+            local DMG_FILE=$(ls "$DMG_DIR"/*.dmg 2>/dev/null | head -1)
+            if [ -z "$DMG_FILE" ]; then
+              echo "WARNING: No $ARCH_NAME DMG found in $DMG_DIR"
+              return 1
+            fi
+
+            echo "Signing $DMG_FILE ($ARCH_NAME)..."
+            local SIG=$(/tmp/bin/sign_update "$DMG_FILE" --ed-key-file <(echo "$SPARKLE_PRIVATE_KEY") 2>&1)
+            local ED_SIG=$(echo "$SIG" | grep -o 'sparkle:edSignature="[^"]*"' | sed 's/sparkle:edSignature="//;s/"//')
+            local LENGTH=$(echo "$SIG" | grep -o 'length="[^"]*"' | sed 's/length="//;s/"//')
+
+            if [ -z "$ED_SIG" ]; then
+              echo "ERROR: Failed to sign $ARCH_NAME DMG"
+              return 1
+            fi
+
+            cat > "$OUTFILE" << APPCAST
+          <?xml version="1.0" encoding="utf-8"?>
+          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+            <channel>
+              <title>Zimi Updates</title>
+              <link>https://github.com/${REPO}</link>
+              <description>Offline knowledge server for ZIM files</description>
+              <language>en</language>
+              <item>
+                <title>Version ${VERSION}</title>
+                <sparkle:version>${VERSION}</sparkle:version>
+                <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
+                <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+                <pubDate>$(date -R)</pubDate>
+                <enclosure
+                  url="https://github.com/${REPO}/releases/download/${TAG}/${DMG_ASSET}"
+                  length="${LENGTH}"
+                  type="application/octet-stream"
+                  sparkle:edSignature="${ED_SIG}"
+                />
+              </item>
+            </channel>
+          </rss>
+          APPCAST
+            sed -i '' 's/^          //' "$OUTFILE"
+            echo "Generated $OUTFILE:"
+            cat "$OUTFILE"
+          }
+
+          generate_appcast "Intel" "Zimi-Intel" "Zimi-Intel.dmg" "appcast-intel.xml"
+          generate_appcast "Apple Silicon" "Zimi-AppleSilicon" "Zimi-AppleSilicon.dmg" "appcast-arm64.xml"
+
+          # Commit and push to main
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add appcast-intel.xml appcast-arm64.xml
+          git diff --cached --quiet && echo "No appcast changes" || {
+            git commit -m "Update appcasts for ${TAG}"
+            git push origin main
+          }
+
+      - name: Update Homebrew cask
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "$HOMEBREW_TAP_TOKEN" ]; then
+            echo "HOMEBREW_TAP_TOKEN not set, skipping cask update"
+            exit 0
+          fi
+
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+
+          # Compute SHA256 for both DMGs
+          SHA_ARM=$(shasum -a 256 Zimi-AppleSilicon/Zimi-AppleSilicon.dmg | awk '{print $1}')
+          SHA_INTEL=$(shasum -a 256 Zimi-Intel/Zimi-Intel.dmg | awk '{print $1}')
+          echo "Apple Silicon SHA256: $SHA_ARM"
+          echo "Intel SHA256: $SHA_INTEL"
+
+          # Clone the tap repo
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/epheterson/homebrew-zimi.git" /tmp/homebrew-zimi
+          cd /tmp/homebrew-zimi
+
+          # Generate updated cask
+          cat > Casks/zimi.rb << CASK
+          cask "zimi" do
+            arch arm: "AppleSilicon", intel: "Intel"
+
+            version "${VERSION}"
+            sha256 arm:   "${SHA_ARM}",
+                   intel: "${SHA_INTEL}"
+
+            url "https://github.com/epheterson/Zimi/releases/download/v#{version}/Zimi-#{arch}.dmg"
+            name "Zimi"
+            desc "Offline knowledge server for ZIM files"
+            homepage "https://github.com/epheterson/Zimi"
+
+            depends_on macos: ">= :ventura"
+
+            app "Zimi.app"
+
+            zap trash: [
+              "~/.config/zimi",
+              "~/Library/Preferences/com.epheterson.zimi.plist",
+            ]
+          end
+          CASK
+          sed -i '' 's/^          //' Casks/zimi.rb
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/zimi.rb
+          git diff --cached --quiet && echo "No cask changes" || {
+            git commit -m "Update zimi to ${VERSION}"
+            git push origin main
+          }
+          echo "Homebrew cask updated to ${VERSION}"
+
+      - name: Create draft release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          draft: true
           files: |
-            Zimi-Linux-amd64/Zimi-Linux-amd64.tar.gz
+            Zimi-Linux-amd64/Zimi-Linux-amd64.AppImage
+            Zimi-Linux-snap/*.snap
             Zimi-Intel/Zimi-Intel.dmg
             Zimi-AppleSilicon/Zimi-AppleSilicon.dmg
-            Zimi-Windows-amd64/Zimi-Windows-amd64.zip

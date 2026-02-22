@@ -1,0 +1,4 @@
+#!/bin/bash
+# AppImage entry point — launches the PyInstaller-bundled Zimi binary.
+HERE="$(dirname "$(readlink -f "$0")")"
+exec "$HERE/Zimi" "$@"

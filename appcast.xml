@@ -5,19 +5,5 @@
     <link>https://github.com/epheterson/Zimi</link>
     <description>Offline knowledge server for ZIM files</description>
     <language>en</language>
-    <item>
-      <title>Version 1.4.1</title>
-      <sparkle:version>1.4.1</sparkle:version>
-      <sparkle:shortVersionString>1.4.1</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <description><![CDATA[<h2>Test Update</h2><p>Testing Sparkle update mechanism.</p>]]></description>
-      <pubDate>Thu, 20 Feb 2026 12:00:00 +0000</pubDate>
-      <enclosure
-        url="https://github.com/epheterson/Zimi/releases/download/v1.4.0-rc5/Zimi-Intel.dmg"
-        length="48692553"
-        type="application/octet-stream"
-        sparkle:edSignature="SKydmlkR+KO8521yMOa4CsCeCOqA24QShg/4qIXAz71yZ5TPizjaCDZps7hQYB1sQ8ZE+i9mzxhn6qp2M0maCw=="
-      />
-    </item>
   </channel>
 </rss>

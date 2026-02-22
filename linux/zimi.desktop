@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Zimi
+Comment=Offline knowledge server for ZIM files
+Exec=Zimi
+Icon=zimi
+Categories=Education;Science;Network;
+Terminal=false
+StartupWMClass=Zimi

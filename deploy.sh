@@ -3,12 +3,16 @@
 set -e
 
 echo "=== Deploying to NAS ==="
-cat zimi.py | ssh nas "cat > /volume1/docker/kiwix/zimi.py"
-cat templates/index.html | ssh nas "cat > /volume1/docker/kiwix/templates/index.html"
+ssh nas "mkdir -p /volume1/docker/kiwix/zimi/templates /volume1/docker/kiwix/zimi/assets"
+cat zimi/server.py | ssh nas "cat > /volume1/docker/kiwix/zimi/server.py"
+cat zimi/__init__.py | ssh nas "cat > /volume1/docker/kiwix/zimi/__init__.py"
+cat zimi/__main__.py | ssh nas "cat > /volume1/docker/kiwix/zimi/__main__.py"
+cat zimi/mcp_server.py | ssh nas "cat > /volume1/docker/kiwix/zimi/mcp_server.py"
+cat zimi/templates/index.html | ssh nas "cat > /volume1/docker/kiwix/zimi/templates/index.html"
+cat zimi/assets/icon.png | ssh nas "cat > /volume1/docker/kiwix/zimi/assets/icon.png"
+cat zimi/assets/apple-touch-icon.png | ssh nas "cat > /volume1/docker/kiwix/zimi/assets/apple-touch-icon.png"
+cat requirements.txt | ssh nas "cat > /volume1/docker/kiwix/requirements.txt"
 cat Dockerfile | ssh nas "cat > /volume1/docker/kiwix/Dockerfile"
-ssh nas "mkdir -p /volume1/docker/kiwix/assets"
-cat assets/icon.png | ssh nas "cat > /volume1/docker/kiwix/assets/icon.png"
-cat assets/apple-touch-icon.png | ssh nas "cat > /volume1/docker/kiwix/assets/apple-touch-icon.png"
 echo "  Files copied"
 
 ssh nas "cd /volume1/docker/kiwix && /usr/local/bin/docker compose build --no-cache" 2>&1 | tail -3
@@ -17,8 +21,10 @@ echo "  NAS deployed"
 
 echo ""
 echo "=== Syncing vault ==="
-cp zimi.py ~/vault/infra/zim-reader/zimi.py
-cp templates/index.html ~/vault/infra/zim-reader/templates/index.html
+mkdir -p ~/vault/infra/zim-reader/zimi/templates
+cp zimi/server.py ~/vault/infra/zim-reader/zimi/server.py
+cp zimi/__init__.py ~/vault/infra/zim-reader/zimi/__init__.py
+cp zimi/templates/index.html ~/vault/infra/zim-reader/zimi/templates/index.html
 echo "  Vault synced"
 
 echo ""

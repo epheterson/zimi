@@ -35,9 +35,11 @@ if platform.system() == "Windows":
 def _icon_path():
     """Find the app icon, handling both dev and PyInstaller bundle paths."""
     if getattr(sys, '_MEIPASS', None):
-        base = sys._MEIPASS
+        # PyInstaller bundle: assets are at _MEIPASS/zimi/assets/
+        base = os.path.join(sys._MEIPASS, "zimi")
     else:
-        base = os.path.dirname(os.path.abspath(__file__))
+        # Dev mode: assets are in the zimi/ package directory
+        base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "zimi")
     png = os.path.join(base, "assets", "icon.png")
     return png if os.path.exists(png) else None
 
@@ -119,7 +121,7 @@ def _find_open_port(start=8899, end=8910):
 
 
 class ServerThread(threading.Thread):
-    """Starts zimi.py serve in a background thread."""
+    """Starts the Zimi server in a background thread."""
 
     def __init__(self, zim_dir, port):
         super().__init__(daemon=True)
@@ -270,6 +272,52 @@ def _set_macos_app_identity(window_ref=None):
             pass
 
 
+def _init_sparkle_updater():
+    """Initialize Sparkle auto-updater on macOS. Must be called on the main thread."""
+    if platform.system() != "Darwin":
+        return
+    try:
+        import objc
+        # Load Sparkle.framework from the app bundle's Frameworks/ directory
+        bundle_path = None
+        if getattr(sys, '_MEIPASS', None):
+            # PyInstaller bundle: framework is in Contents/Frameworks/
+            app_bundle_path = os.path.dirname(os.path.dirname(sys._MEIPASS))
+            bundle_path = os.path.join(app_bundle_path, "Frameworks", "Sparkle.framework")
+        if not bundle_path or not os.path.exists(bundle_path):
+            # Dev mode: framework in repo root
+            bundle_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Sparkle.framework")
+        if not os.path.exists(bundle_path):
+            return
+
+        sparkle_bundle = objc.loadBundle(
+            "Sparkle", bundle_path=bundle_path,
+            module_globals=globals()
+        )
+
+        # SPUStandardUpdaterController manages the full update lifecycle
+        SPUStandardUpdaterController = objc.lookUpClass("SPUStandardUpdaterController")
+        controller = SPUStandardUpdaterController.alloc().initWithStartingUpdater_updaterDelegate_userDriverDelegate_(
+            True,  # startingUpdater: begin checking for updates immediately
+            None,  # updaterDelegate
+            None,  # userDriverDelegate
+        )
+
+        # Point at architecture-specific appcast so AS users get the AS DMG
+        import platform as _plat
+        from Foundation import NSURL
+        arch = _plat.machine()  # "arm64" or "x86_64"
+        arch_suffix = "arm64" if arch == "arm64" else "intel"
+        feed_url = f"https://raw.githubusercontent.com/epheterson/Zimi/main/appcast-{arch_suffix}.xml"
+        controller.updater().setFeedURL_(NSURL.URLWithString_(feed_url))
+
+        # Keep a strong reference to prevent garbage collection
+        _init_sparkle_updater._controller = controller
+    except Exception as e:
+        # Sparkle is optional — app works fine without it
+        print(f"Sparkle init failed: {e}")
+
+
 def _setup_macos_menu(window_ref):
     """Add Settings... to the Zimi app menu (Cmd+,). Must dispatch to main thread."""
     import objc
@@ -324,6 +372,15 @@ def _setup_macos_menu(window_ref):
         insert_idx = min(2, app_menu.numberOfItems())
         app_menu.insertItem_atIndex_(NSMenuItem.separatorItem(), insert_idx)
         app_menu.insertItem_atIndex_(settings_item, insert_idx + 1)
+
+        # Add "Check for Updates..." if Sparkle is initialized
+        controller = getattr(_init_sparkle_updater, '_controller', None)
+        if controller:
+            update_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+                "Check for Updates\u2026", "checkForUpdates:", ""
+            )
+            update_item.setTarget_(controller)
+            app_menu.insertItem_atIndex_(update_item, insert_idx + 2)
 
     # AppKit menu ops must run on the main thread
     AppHelper.callAfter(_add_menu)
@@ -407,6 +464,14 @@ def _run():
 
     def _on_webview_ready():
         """Called when the webview window is shown — start server and navigate."""
+        # Initialize Sparkle first (so the menu setup can find the controller)
+        if platform.system() == "Darwin":
+            try:
+                from PyObjCTools import AppHelper
+                AppHelper.callAfter(_init_sparkle_updater)
+            except Exception:
+                pass
+
         # Add native macOS menu items now that the app menu bar exists
         _set_macos_app_identity(window_ref)
 
@@ -470,8 +535,71 @@ def _run():
     webview.start(gui=gui)
 
 
+def _serve_headless():
+    """Run the HTTP server without a GUI window (for CI testing).
+
+    Usage: Zimi --serve [--port PORT] [--zim-dir DIR]
+    Prints 'READY <port>' to stdout when the server is listening.
+    Port 0 picks a random available port.
+    """
+    # Parse --port and --zim-dir from argv
+    port = 8899
+    zim_dir = None
+    args = sys.argv[1:]
+    i = 0
+    while i < len(args):
+        if args[i] == "--port" and i + 1 < len(args):
+            port = int(args[i + 1])
+            i += 2
+        elif args[i] == "--zim-dir" and i + 1 < len(args):
+            zim_dir = args[i + 1]
+            i += 2
+        else:
+            i += 1
+
+    if zim_dir is None:
+        config = ConfigManager()
+        zim_dir = config.get("zim_dir")
+
+    os.environ["ZIM_DIR"] = zim_dir
+    os.environ["ZIMI_MANAGE"] = "1"
+    os.makedirs(zim_dir, exist_ok=True)
+
+    import zimi
+    zimi.ZIM_DIR = zim_dir
+    zimi.ZIMI_DATA_DIR = os.path.join(zim_dir, ".zimi")
+    os.makedirs(zimi.ZIMI_DATA_DIR, exist_ok=True)
+    zimi.ZIMI_MANAGE = True
+    zimi._TITLE_INDEX_DIR = os.path.join(zimi.ZIMI_DATA_DIR, "titles")
+    zimi.load_cache()
+    zimi._migrate_data_files()
+
+    # Pre-warm archives
+    for name in zimi.get_zim_files():
+        try:
+            zimi.get_archive(name)
+        except Exception:
+            pass
+
+    # Build title indexes in background
+    threading.Thread(target=zimi._build_all_title_indexes, daemon=True).start()
+
+    from http.server import ThreadingHTTPServer
+    server = ThreadingHTTPServer(("127.0.0.1", port), zimi.ZimHandler)
+    actual_port = server.server_address[1]
+    print(f"READY {actual_port}", flush=True)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        server.shutdown()
+
+
 def main():
     """Wrapper that restarts the app when exit code is 42."""
+    if "--serve" in sys.argv:
+        _serve_headless()
+        return
+
     if "--run" in sys.argv:
         _run()
         return
