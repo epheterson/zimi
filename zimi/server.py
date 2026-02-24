@@ -1306,6 +1306,8 @@ def search_zim(archive, query_str, limit=10, snippets=True):
     return results
 
 
+_meta_title_re = re.compile(r'^(Portal:|Category:|Wikipedia:|Template:|Help:|File:|Special:|List of |Index of |Outline of )', re.IGNORECASE)
+
 STOP_WORDS = {"a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
               "has", "have", "how", "i", "in", "is", "it", "its", "my", "not",
               "of", "on", "or", "so", "that", "the", "this", "to", "was", "we",
@@ -1453,7 +1455,7 @@ def search_all(query_str, limit=5, filter_zim=None, fast=False):
                 archive = get_archive(name)
                 if archive is None:
                     archive = open_archive(zims[name])
-                results = search_zim(archive, cleaned, limit=limit)
+                results = search_zim(archive, cleaned, limit=limit, snippets=False)
                 dt = time.time() - t0
                 if dt > 0.3:
                     timings.append(f"{name}={dt:.1f}s")
@@ -1606,7 +1608,11 @@ def random_entry(archive, max_attempts=8, rng=None):
                 # Skip non-article entries (metadata, assets, etc.)
                 if entry.path.startswith("_") or entry.path.startswith("-/"):
                     continue
-                return {"path": entry.path, "title": entry.title}
+                # Skip meta/portal pages — not interesting for "random article"
+                title = entry.title or ""
+                if _meta_title_re.search(title):
+                    continue
+                return {"path": entry.path, "title": title}
             except Exception:
                 continue
 
@@ -1730,7 +1736,6 @@ def _get_dated_entry(archive, zim_name, mmdd, rng=None):
                 candidates.append(link)
             _rng = rng or _random
             _rng.shuffle(candidates)
-            _skip_titles = re.compile(r'^(Portal:|List of |Index of |Outline of |Wikipedia:|Template:|Category:)', re.IGNORECASE)
             for link in candidates[:30]:
                 for prefix in ["A/", ""]:
                     try:
@@ -1741,7 +1746,7 @@ def _get_dated_entry(archive, zim_name, mmdd, rng=None):
                         if not (item.mimetype or "").startswith("text/html"):
                             continue
                         title = entry.title or ""
-                        if _skip_titles.search(title) or len(title) < 3:
+                        if _meta_title_re.search(title) or len(title) < 3:
                             continue
                         return {"path": entry.path, "title": title}
                     except (KeyError, Exception):
@@ -3061,22 +3066,23 @@ class ZimHandler(BaseHTTPRequestHandler):
                 want_thumb = param("thumb") == "1"
                 require_thumb = param("require_thumb") == "1"
                 is_wiktionary = "wiktionary" in pick_name.lower()
-                max_tries = 50 if is_wiktionary else (5 if require_thumb else 1)
+                max_tries = 20 if is_wiktionary else (5 if require_thumb else 1)
                 t0 = time.time()
                 with _zim_lock:
                     archive = get_archive(pick_name)
                     if archive is None:
                         return self._json(200, {"error": "archive not available"})
-                    date_param = param("date")  # MMDD format
-                    seed_param = param("seed")  # For deterministic daily picks
-                    rng = None
-                    if seed_param:
-                        import hashlib
-                        seed_val = int(hashlib.md5((pick_name + seed_param).encode()).hexdigest()[:8], 16)
-                        rng = _random.Random(seed_val)
-                    best_result = None
-                    best_preview = None
-                    for _try in range(max_tries):
+                date_param = param("date")  # MMDD format
+                seed_param = param("seed")  # For deterministic daily picks
+                rng = None
+                if seed_param:
+                    import hashlib
+                    seed_val = int(hashlib.md5((pick_name + seed_param).encode()).hexdigest()[:8], 16)
+                    rng = _random.Random(seed_val)
+                best_result = None
+                best_preview = None
+                for _try in range(max_tries):
+                    with _zim_lock:
                         result = None
                         if date_param and len(date_param) == 4 and _try == 0:
                             result = _get_dated_entry(archive, pick_name, date_param, rng=rng)
@@ -3087,25 +3093,25 @@ class ZimHandler(BaseHTTPRequestHandler):
                         preview = None
                         if want_thumb:
                             preview = _extract_preview(archive, pick_name, result["path"])
-                        # Skip non-English or boring wiktionary entries (retry)
-                        if is_wiktionary and preview and (preview.get("non_english") or preview.get("boring")):
-                            if best_result is None:
-                                best_result = result
-                                best_preview = preview
-                            continue
-                        # Wiktionary: accept interesting English entry even without thumbnail
-                        if is_wiktionary and preview and not preview.get("non_english") and not preview.get("boring"):
-                            best_result = result
-                            best_preview = preview
-                            break
-                        if not require_thumb or (preview and preview["thumbnail"]):
-                            best_result = result
-                            best_preview = preview
-                            break
-                        # Keep first result as fallback even without image
+                    # Skip non-English or boring wiktionary entries (retry)
+                    if is_wiktionary and preview and (preview.get("non_english") or preview.get("boring")):
                         if best_result is None:
                             best_result = result
                             best_preview = preview
+                        continue
+                    # Wiktionary: accept interesting English entry even without thumbnail
+                    if is_wiktionary and preview and not preview.get("non_english") and not preview.get("boring"):
+                        best_result = result
+                        best_preview = preview
+                        break
+                    if not require_thumb or (preview and preview["thumbnail"]):
+                        best_result = result
+                        best_preview = preview
+                        break
+                    # Keep first result as fallback even without image
+                    if best_result is None:
+                        best_result = result
+                        best_preview = preview
                 if not best_result:
                     return self._json(200, {"error": "no articles found"})
                 dt = time.time() - t0
@@ -3308,8 +3314,8 @@ class ZimHandler(BaseHTTPRequestHandler):
             if parsed.path == "/resolve":
                 # Batch cross-ZIM URL resolution: POST {"urls": [...]} → {"results": {...}}
                 urls = data.get("urls", [])
-                if not isinstance(urls, list) or len(urls) > 50:
-                    return self._json(400, {"error": "'urls' must be a list (max 50)"})
+                if not isinstance(urls, list) or len(urls) > 100:
+                    return self._json(400, {"error": "'urls' must be a list (max 100)"})
                 results = {}
                 with _zim_lock:
                     for url_str in urls:
