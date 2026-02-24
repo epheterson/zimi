@@ -358,6 +358,15 @@ def _setup_macos_menu(window_ref):
                         daemon=True,
                     ).start()
 
+            def reloadPage_(self, sender):
+                window = window_ref.get("window")
+                if window:
+                    threading.Thread(
+                        target=window.evaluate_js,
+                        args=("location.reload()",),
+                        daemon=True,
+                    ).start()
+
         delegate = ZimiMenuDelegate.alloc().init()
         # Keep a strong reference so it doesn't get garbage-collected
         window_ref["_menu_delegate"] = delegate
@@ -372,6 +381,18 @@ def _setup_macos_menu(window_ref):
         insert_idx = min(2, app_menu.numberOfItems())
         app_menu.insertItem_atIndex_(NSMenuItem.separatorItem(), insert_idx)
         app_menu.insertItem_atIndex_(settings_item, insert_idx + 1)
+
+        # Add View menu with Reload (Cmd+R)
+        from AppKit import NSMenu
+        view_menu = NSMenu.alloc().initWithTitle_("View")
+        reload_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "Reload", "reloadPage:", "r"
+        )
+        reload_item.setTarget_(delegate)
+        view_menu.addItem_(reload_item)
+        view_menu_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("View", None, "")
+        view_menu_item.setSubmenu_(view_menu)
+        main_menu.addItem_(view_menu_item)
 
         # Add "Check for Updates..." if Sparkle is initialized
         controller = getattr(_init_sparkle_updater, '_controller', None)

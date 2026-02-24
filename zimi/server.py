@@ -29,6 +29,8 @@ Usage (HTTP API):
   GET /list                            List all ZIM sources with metadata
   GET /catalog?zim=...                 PDF catalog for zimgit-style ZIMs
   GET /random                          Random article
+  GET /resolve?url=...                 Cross-ZIM URL resolution
+  GET /resolve?domains=1               Domain→ZIM map for installed sources
   GET /health                          Health check
 """
 
@@ -73,7 +75,7 @@ except ImportError:
 # SSL context using certifi CA bundle (PyInstaller bundles lack system certs)
 SSL_CTX = ssl.create_default_context(cafile=certifi.where())
 
-ZIMI_VERSION = "1.4.0"
+ZIMI_VERSION = "1.5.0"
 
 log = logging.getLogger("zimi")
 logging.basicConfig(format="%(asctime)s %(message)s", datefmt="%H:%M:%S", level=logging.INFO)
@@ -419,7 +421,23 @@ MIME_FALLBACK = {
     ".xml": "application/xml", ".txt": "text/plain",
     ".wasm": "application/wasm", ".bcmap": "application/octet-stream",
     ".properties": "text/plain",
+    ".mp4": "video/mp4", ".webm": "video/webm", ".ogv": "video/ogg",
+    ".mp3": "audio/mpeg", ".ogg": "audio/ogg", ".wav": "audio/wav",
+    ".opus": "audio/opus", ".flac": "audio/flac",
+    ".vtt": "text/vtt", ".srt": "text/plain",
 }
+
+def _namespace_fallbacks(path):
+    """Generate alternative paths for old/new namespace ZIM compatibility.
+    Old ZIMs use A/ (articles), I/ (images), C/ (CSS), -/ (metadata) prefixes.
+    New ZIMs dropped them. Try stripping or adding prefixes to find the entry."""
+    prefixes = ("A/", "I/", "C/", "-/")
+    for p in prefixes:
+        if path.startswith(p):
+            yield path[len(p):]  # strip prefix
+            return
+    for p in prefixes:
+        yield p + path  # add prefix
 
 # MIME types that benefit from gzip (text-based, not already compressed)
 COMPRESSIBLE_TYPES = {"text/", "application/javascript", "application/json", "application/xml", "image/svg+xml"}
@@ -534,6 +552,7 @@ _zim_files_cache = None  # {name: path} — cached at startup, ZIM dir is read-o
 _archive_pool = {}  # {name: Archive} — kept open for fast search
 _archive_lock = threading.Lock()  # protects _archive_pool writes in threaded mode
 _zim_lock = threading.Lock()      # serializes all libzim operations (C library is NOT thread-safe)
+# Lock ordering: _zim_lock → _archive_lock (never acquire _zim_lock while holding _archive_lock)
 
 # Separate archive handles for suggestion search — allows title lookups to run in
 # parallel with Xapian FTS by using independent C++ Archive objects + their own lock.
@@ -895,6 +914,41 @@ def _build_all_title_indexes():
                 pass
     log.info("Title index pool warmed: %d connections (%.1fs)", warmed, time.time() - t0)
 
+    # Auto-build FTS5 for ZIMs where estimated build time < 5 minutes.
+    # Index DB size < 2.5 GB correlates with ~5 min on spinning disk.
+    _FTS5_AUTO_BUILD_MAX_MB = 2500
+    auto_fts = 0
+    for name in zims:
+        conn = _get_title_db(name)
+        if not conn:
+            continue
+        try:
+            fts_row = conn.execute("SELECT value FROM meta WHERE key='has_fts'").fetchone()
+        except Exception:
+            continue
+        if fts_row and fts_row[0] == "1":
+            continue
+        db_path = _title_index_path(name)
+        try:
+            size_mb = os.path.getsize(db_path) / (1024 * 1024)
+        except OSError:
+            continue
+        if size_mb < _FTS5_AUTO_BUILD_MAX_MB:
+            try:
+                with _title_index_status_lock:
+                    _title_index_status["building_now"] = name
+                    _title_index_status["state"] = "building"
+                _build_fts_for_index(name)
+                auto_fts += 1
+            except Exception as e:
+                log.warning("Auto FTS5 build failed for %s: %s", name, e)
+    if auto_fts:
+        log.info("Auto-built FTS5 for %d indexes", auto_fts)
+    with _title_index_status_lock:
+        _title_index_status["state"] = "ready"
+        _title_index_status["building_now"] = None
+        _title_index_status["finished_at"] = time.time()
+
 def _clean_stale_title_indexes():
     """Remove title index DBs for ZIM files that no longer exist."""
     if not os.path.exists(_TITLE_INDEX_DIR):
@@ -947,6 +1001,182 @@ def get_zim_files():
         return _zim_files_cache
     _zim_files_cache = _scan_zim_files()
     return _zim_files_cache
+
+
+# ── Cross-ZIM Domain Map ──
+# Maps external domains → installed ZIM short names, enabling cross-ZIM navigation.
+# Built once at startup (or on cache reload), lives in memory.
+
+# Wellknown domains where filename ≠ domain (Wikimedia projects, etc.)
+
+_domain_zim_map = {}  # {domain: zim_name} — only installed ZIMs
+_xzim_refs = {}  # {(source_zim, target_zim): count} — cross-ZIM reference tracking
+_xzim_refs_lock = threading.Lock()  # protects _xzim_refs read-modify-write
+
+
+def _build_domain_zim_map():
+    """Build domain→ZIM map entirely from ZIM metadata — no hardcoded lists.
+
+    Three auto-discovery methods, in order:
+    1. Filename extraction: "stackoverflow.com_en_all_*.zim" → stackoverflow.com
+    2. Source metadata: ZIM Source="www.appropedia.org" → appropedia.org
+    3. Name-based inference: ZIM name "wikihow" → wikihow.com (try common TLDs)
+
+    For each discovered domain, also registers www. and mobile (en.m.) variants.
+    """
+    global _domain_zim_map
+    zims = get_zim_files()
+    dmap = {}
+
+    def _add_domain(domain, name):
+        """Register a domain and its common variants (www., mobile)."""
+        domain = domain.lower().strip()
+        if not domain or "." not in domain:
+            return
+        if domain not in dmap:
+            dmap[domain] = name
+        # www. variant
+        if domain.startswith("www."):
+            bare = domain[4:]
+            if bare not in dmap:
+                dmap[bare] = name
+        else:
+            www = "www." + domain
+            if www not in dmap:
+                dmap[www] = name
+        # Mobile Wikimedia variant: en.X.org → en.m.X.org
+        m = re.match(r'^(en)\.(wiki\w+\.org)$', domain)
+        if m:
+            mobile = f"{m.group(1)}.m.{m.group(2)}"
+            if mobile not in dmap:
+                dmap[mobile] = name
+
+    # 1. Extract domains from ZIM filenames
+    for name, path in zims.items():
+        filename = os.path.basename(path)
+        base = filename.split(".zim")[0]
+        m = re.match(r'^([a-zA-Z0-9.-]+\.[a-z]{2,})_', base)
+        if m:
+            _add_domain(m.group(1), name)
+
+    # 2. Extract domains from ZIM Source metadata
+    mapped_names = set(dmap.values())
+    for name, path in zims.items():
+        if name in mapped_names:
+            continue
+        archive = get_archive(name)
+        if not archive:
+            continue
+        try:
+            source = bytes(archive.get_metadata("Source")).decode("utf-8", "replace").strip()
+        except Exception:
+            continue
+        if not source:
+            continue
+        try:
+            if "://" in source:
+                domain = urlparse(source).hostname or ""
+            else:
+                domain = source.split("/")[0]
+        except Exception:
+            continue
+        _add_domain(domain, name)
+
+    # 3. Name-based inference for unmapped ZIMs: try <name>.com, .org, .io
+    mapped_names = set(dmap.values())
+    for name in zims:
+        if name in mapped_names:
+            continue
+        # Skip names that clearly aren't domains (zimgit-, devdocs_, etc.)
+        if name.startswith("zimgit") or "_en_" in name:
+            continue
+        for tld in [".com", ".org", ".io", ".net"]:
+            candidate = name + tld
+            _add_domain(candidate, name)
+
+    _domain_zim_map = dmap
+    log.info("Domain map: %d domains → %d ZIMs", len(dmap), len(set(dmap.values())))
+
+
+def _resolve_url_to_zim(url_str):
+    """Resolve an external URL to a ZIM name + entry path, or None.
+
+    Returns {"zim": name, "path": path} if found, else None.
+    Must be called with _zim_lock held (uses archive.get_entry_by_path).
+    """
+    try:
+        parsed = urlparse(url_str)
+    except Exception:
+        return None
+    host = (parsed.hostname or "").lower()
+    if not host:
+        return None
+
+    # Look up domain (try exact, then without www.)
+    zim_name = _domain_zim_map.get(host)
+    if not zim_name:
+        bare = re.sub(r'^www\.', '', host)
+        zim_name = _domain_zim_map.get(bare)
+    if not zim_name:
+        return None
+
+    archive = get_archive(zim_name)
+    if archive is None:
+        return None
+
+    url_path = unquote(parsed.path).lstrip("/")
+
+    # Build candidate paths based on domain type
+    candidates = []
+    if "wikipedia.org" in host or "wiktionary.org" in host or "wikivoyage.org" in host \
+       or "wikibooks.org" in host or "wikiversity.org" in host or "wikiquote.org" in host \
+       or "wikinews.org" in host:
+        # Wikimedia: /wiki/Article_Name → A/Article_Name
+        rest = re.sub(r'^wiki/', '', url_path)
+        candidates.append("A/" + rest)
+        candidates.append(rest)
+        # Strip Wikimedia namespaces (Topic:, Category:, Portal:, etc.)
+        ns_stripped = re.sub(r'^[A-Z][a-z]+:', '', rest)
+        if ns_stripped != rest:
+            candidates.append(ns_stripped)
+            candidates.append("A/" + ns_stripped)
+    elif "stackexchange.com" in host or "stackoverflow.com" in host \
+         or "serverfault.com" in host or "superuser.com" in host or "askubuntu.com" in host:
+        # Stack Exchange: /questions/12345/title → A/questions/12345/title
+        candidates.append("A/" + url_path)
+        candidates.append(url_path)
+    elif "rationalwiki.org" in host or "appropedia.org" in host:
+        # MediaWiki sites: /wiki/Article → Article (no A/ prefix)
+        rest = re.sub(r'^wiki/', '', url_path)
+        candidates.append(rest)
+        candidates.append("A/" + rest)
+    elif "explainxkcd.com" in host:
+        # /wiki/index.php/1234 → 1234:_Title (try number prefix match)
+        rest = re.sub(r'^wiki/index\.php/', '', url_path)
+        candidates.append(rest)
+        candidates.append("A/" + rest)
+    elif "wikihow.com" in host:
+        # WikiHow: /Article-Name → A/Article-Name
+        candidates.append("A/" + url_path)
+        candidates.append(url_path)
+    else:
+        # General: try both A/<path> and raw <path>, plus domain-prefixed path
+        candidates.append("A/" + url_path)
+        candidates.append(url_path)
+        # Some ZIMs prefix paths with domain (e.g. apod.nasa.gov/apod/ap...)
+        if host:
+            candidates.append(host + "/" + url_path)
+
+    # Try each candidate path
+    for cpath in candidates:
+        if not cpath:
+            continue
+        try:
+            archive.get_entry_by_path(cpath)
+            return {"zim": zim_name, "path": cpath}
+        except KeyError:
+            continue
+    return None
 
 
 def strip_html(text):
@@ -1332,29 +1562,6 @@ def get_catalog(zim_name):
 
 # Diverse seed words for random article selection via FTS.
 # Broad topics ensure good coverage across any ZIM's content.
-_RANDOM_SEEDS = [
-    "water", "history", "city", "river", "mountain", "island", "language",
-    "music", "science", "animal", "plant", "country", "ocean", "bridge",
-    "school", "hospital", "library", "garden", "forest", "desert", "lake",
-    "village", "temple", "church", "castle", "museum", "airport", "railway",
-    "highway", "harbor", "stadium", "university", "market", "palace", "tower",
-    "valley", "canyon", "volcano", "glacier", "peninsula", "archipelago",
-    "republic", "kingdom", "province", "district", "county", "territory",
-    "century", "dynasty", "revolution", "treaty", "empire", "colony",
-    "protein", "molecule", "element", "mineral", "crystal", "fossil",
-    "galaxy", "planet", "asteroid", "comet", "nebula", "satellite",
-    "symphony", "opera", "poetry", "novel", "painting", "sculpture",
-    "football", "cricket", "baseball", "tennis", "swimming", "marathon",
-    "tiger", "eagle", "whale", "dolphin", "elephant", "butterfly",
-    "algorithm", "database", "network", "protocol", "compiler", "kernel",
-    "vitamin", "bacteria", "vaccine", "surgery", "therapy", "diagnosis",
-    "climate", "earthquake", "hurricane", "tsunami", "drought", "monsoon",
-    "democracy", "constitution", "parliament", "election", "treaty", "alliance",
-    "copper", "silver", "diamond", "granite", "marble", "limestone",
-    "chocolate", "coffee", "cotton", "silk", "rubber", "petroleum",
-    "cathedral", "monastery", "pyramid", "lighthouse", "reservoir", "canal",
-    "bicycle", "automobile", "aircraft", "submarine", "rocket", "telescope",
-]
 
 def _pick_html_entry(archive, paths):
     """From a list of entry paths, return the first valid HTML/PDF article."""
@@ -1374,34 +1581,39 @@ def _pick_html_entry(archive, paths):
     return None
 
 
-def random_entry(archive, max_attempts=6):
-    """Pick a random article. Tries FTS first (fast), falls back to title suggestions.
+def random_entry(archive, max_attempts=8, rng=None):
+    """Pick a random article using random entry index (fast, no seed lists).
 
-    FTS (Xapian Searcher) is much faster on large ZIMs (Wikipedia: ~1-2s vs 7-15s)
-    because inverted indexes allow O(log n) lookups vs sequential prefix scans.
-    But some ZIMs lack FTS indexes, so we fall back to SuggestionSearcher.
+    Primary: pick random indices from the archive's entry range.
+    Fallback: SuggestionSearcher with random 2-char prefixes.
+    If rng is provided, use it for deterministic picks (daily persistence).
     """
-    # Phase 1: FTS with random seed words (fast on large ZIMs)
-    seeds = _random.sample(_RANDOM_SEEDS, min(max_attempts, len(_RANDOM_SEEDS)))
-    for seed in seeds:
-        try:
-            searcher = Searcher(archive)
-            query = Query().set_query(seed)
-            search = searcher.search(query)
-            count = search.getEstimatedMatches()
-            if count == 0:
+    if rng is None:
+        rng = _random
+    # Phase 1: Random entry by index (O(1) per attempt, works on all ZIMs)
+    total = archive.entry_count
+    if total > 0:
+        for _ in range(max_attempts):
+            idx = rng.randint(0, total - 1)
+            try:
+                entry = archive._get_entry_by_id(idx)
+                if entry.is_redirect:
+                    entry = entry.get_redirect_entry()
+                item = entry.get_item()
+                mt = item.mimetype or ""
+                if not mt.startswith("text/html") and mt != "application/pdf":
+                    continue
+                # Skip non-article entries (metadata, assets, etc.)
+                if entry.path.startswith("_") or entry.path.startswith("-/"):
+                    continue
+                return {"path": entry.path, "title": entry.title}
+            except Exception:
                 continue
-            paths = list(search.getResults(0, min(count, 30)))
-            result = _pick_html_entry(archive, paths)
-            if result:
-                return result
-        except Exception:
-            break  # FTS not available — fall through to suggestions
 
-    # Phase 2: SuggestionSearcher fallback (works on ZIMs without FTS index)
+    # Phase 2: SuggestionSearcher fallback
     chars = "abcdefghijklmnopqrstuvwxyz"
     for _ in range(max_attempts):
-        prefix = _random.choice(chars) + _random.choice(chars)
+        prefix = rng.choice(chars) + rng.choice(chars)
         try:
             ss = SuggestionSearcher(archive)
             suggestion = ss.suggest(prefix)
@@ -1415,6 +1627,535 @@ def random_entry(archive, max_attempts=6):
         except Exception:
             continue
     return None
+
+
+_factbook_countries_cache = None  # list of (path, title) sorted alphabetically
+
+
+def _get_factbook_countries(archive):
+    """Build sorted list of country pages from World Factbook ZIM. Cached."""
+    global _factbook_countries_cache
+    if _factbook_countries_cache is not None:
+        return _factbook_countries_cache
+    countries = []
+    # Try common path patterns: "countries/XX.html" or "geos/XX.html"
+    for pattern_prefix in ("countries", "geos"):
+        for i in range(archive.entry_count):
+            try:
+                entry = archive._get_entry_by_id(i)
+                p = entry.path
+                if p.startswith(pattern_prefix + "/") and p.endswith(".html") \
+                        and len(p) == len(pattern_prefix) + 8:  # e.g. "geos/xx.html"
+                    countries.append((p, entry.title))
+            except Exception:
+                continue
+        if countries:
+            break
+    if not countries:
+        # Fallback: collect any HTML pages that look like country pages
+        # (short path, not a field page, not index)
+        for i in range(archive.entry_count):
+            try:
+                entry = archive._get_entry_by_id(i)
+                p = entry.path
+                if p.endswith(".html") and "/" in p and len(p.split("/")) == 2 \
+                        and not p.startswith("fields/") and p != "index.html" \
+                        and not p.startswith("print_"):
+                    countries.append((p, entry.title))
+            except Exception:
+                continue
+    countries.sort(key=lambda x: x[1])
+    _factbook_countries_cache = countries
+    log.info("factbook countries: %d entries", len(countries))
+    return countries
+
+
+def _get_dated_entry(archive, zim_name, mmdd, rng=None):
+    """Try to find an article for today's date in date-based or content ZIMs.
+
+    Strategies:
+    1. APOD: construct path directly (apYYMMDD)
+    2. Wikipedia: look for "On this day" style pages (month+day events)
+    3. Any ZIM with FTS: search for "month day" to find date-relevant content
+
+    Must be called with _zim_lock held.
+    """
+    mm, dd = mmdd[:2], mmdd[2:]
+    months = ["January", "February", "March", "April", "May", "June",
+              "July", "August", "September", "October", "November", "December"]
+    month_name = months[int(mm) - 1]
+    day_num = str(int(dd))  # strip leading zero
+
+    # APOD: try paths like apod.nasa.gov/apod/ap{YY}{MM}{DD}.html for recent years
+    if "apod" in zim_name.lower():
+        now = time.localtime()
+        for year_offset in range(0, 30):
+            yr = now.tm_year - year_offset
+            yy = str(yr)[-2:]
+            path = f"apod.nasa.gov/apod/ap{yy}{mm}{dd}.html"
+            try:
+                entry = archive.get_entry_by_path(path)
+                return {"path": path, "title": entry.title}
+            except KeyError:
+                continue
+
+    # Wikipedia: load the "Month_Day" article and follow a random internal link
+    # to an actual interesting article (the date page itself is a list of events)
+    if "wikipedia" in zim_name.lower():
+        date_page_html = None
+        for prefix in ["A/", ""]:
+            dpath = f"{prefix}{month_name}_{day_num}"
+            try:
+                entry = archive.get_entry_by_path(dpath)
+                if entry.is_redirect:
+                    entry = entry.get_redirect_entry()
+                raw = bytes(entry.get_item().content)
+                date_page_html = raw.decode("utf-8", errors="replace")[:100000]
+                break
+            except KeyError:
+                continue
+        if date_page_html:
+            # Extract article links from the date page (href="./Title" or href="A/Title")
+            links = re.findall(r'href=["\'](?:\./|A/)([^"\'#]+)["\']', date_page_html)
+            # Filter out year pages (just digits), meta pages, and duplicates
+            seen = set()
+            candidates = []
+            for link in links:
+                clean = unquote(link).replace("_", " ")
+                if clean in seen or re.match(r'^\d+$', clean):
+                    continue
+                if any(clean.startswith(ns) for ns in ["Category:", "Wikipedia:", "Template:", "Help:", "Portal:", "File:", "Special:"]):
+                    continue
+                seen.add(clean)
+                candidates.append(link)
+            _rng = rng or _random
+            _rng.shuffle(candidates)
+            _skip_titles = re.compile(r'^(Portal:|List of |Index of |Outline of |Wikipedia:|Template:|Category:)', re.IGNORECASE)
+            for link in candidates[:30]:
+                for prefix in ["A/", ""]:
+                    try:
+                        entry = archive.get_entry_by_path(prefix + link)
+                        if entry.is_redirect:
+                            entry = entry.get_redirect_entry()
+                        item = entry.get_item()
+                        if not (item.mimetype or "").startswith("text/html"):
+                            continue
+                        title = entry.title or ""
+                        if _skip_titles.search(title) or len(title) < 3:
+                            continue
+                        return {"path": entry.path, "title": title}
+                    except (KeyError, Exception):
+                        continue
+
+    # World Factbook: pick a country page by day-of-year index
+    if "theworldfactbook" in zim_name.lower():
+        countries = _get_factbook_countries(archive)
+        if countries:
+            now = time.localtime()
+            doy = now.tm_yday
+            path, title = countries[doy % len(countries)]
+            # Clean factbook titles: "Africa :: Zambia — The World Factbook" → "Zambia"
+            title = re.sub(r'\s*[\u2014–—]\s*The World Factbook.*$', '', title)
+            title = re.sub(r'^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s*::\s*', '', title)
+            return {"path": path, "title": title.strip()}
+
+    # FTS search: look for "month day" in article titles
+    try:
+        searcher = Searcher(archive)
+        query = Query().set_query(f"{month_name} {day_num}")
+        search = searcher.search(query)
+        count = search.getEstimatedMatches()
+        if count > 0:
+            paths = list(search.getResults(0, min(count, 10)))
+            result = _pick_html_entry(archive, paths)
+            if result:
+                return result
+    except Exception:
+        pass
+
+    return None
+
+
+# XKCD comic date lookup — parsed from the archive page (cached per ZIM)
+_xkcd_date_cache = {}  # comic_number → "YYYY-MM-DD"
+_xkcd_date_cache_built = False
+
+def _xkcd_date_lookup(archive, path):
+    """Look up publication date for an XKCD comic from the archive page.
+
+    Parses xkcd.com/archive/ once and caches the number→date mapping.
+    Must be called with _zim_lock held.
+    """
+    global _xkcd_date_cache_built
+    if not _xkcd_date_cache_built:
+        _xkcd_date_cache_built = True
+        try:
+            entry = archive.get_entry_by_path("xkcd.com/archive/")
+            raw = bytes(entry.get_item().content)
+            html_str = raw.decode("utf-8", errors="replace")
+            for m in re.finditer(r'href="[^"]*?/(\d+)/?"[^>]*?title="(\d{4}-\d{1,2}-\d{1,2})"', html_str):
+                num, date_str = m.group(1), m.group(2)
+                # Normalize to YYYY-MM-DD with zero-padding
+                parts = date_str.split("-")
+                normalized = f"{parts[0]}-{int(parts[1]):02d}-{int(parts[2]):02d}"
+                _xkcd_date_cache[num] = normalized
+            log.info("xkcd date cache: %d comics", len(_xkcd_date_cache))
+        except Exception as e:
+            log.warning("xkcd date cache failed: %s", e)
+    # Extract comic number from path like "xkcd.com/2607/"
+    m = re.search(r'/(\d+)/?$', path)
+    if m:
+        return _xkcd_date_cache.get(m.group(1))
+    return None
+
+
+def _resolve_img_path(archive, path, src):
+    """Resolve a relative image src to a ZIM entry path. Returns URL or None."""
+    decoded = unquote(unquote(src))
+    if decoded.startswith("/"):
+        img_path = decoded.lstrip("/")
+    else:
+        base = "/".join(path.split("/")[:-1])
+        img_path = (base + "/" + decoded) if base else decoded
+    parts = []
+    for seg in img_path.replace("\\", "/").split("/"):
+        if seg == "..":
+            if parts: parts.pop()
+        elif seg and seg != ".":
+            parts.append(seg)
+    img_path = "/".join(parts)
+    try:
+        archive.get_entry_by_path(img_path)
+        return img_path
+    except KeyError:
+        pass
+    if img_path.startswith("A/"):
+        try:
+            bare = img_path[2:]
+            archive.get_entry_by_path(bare)
+            return bare
+        except KeyError:
+            pass
+    return None
+
+
+def _extract_preview(archive, zim_name, path):
+    """Extract the best thumbnail image and a text blurb from an article.
+
+    Uses Open Graph / Twitter meta tags first, falls back to largest content
+    image and first substantial <p> text. This is the same approach used by
+    iMessage, Slack, and Discord for link previews.
+
+    Returns {"thumbnail": str|None, "blurb": str|None}.
+    Must be called with _zim_lock held.
+    """
+    result = {"thumbnail": None, "blurb": None, "title": None}
+    try:
+        entry = archive.get_entry_by_path(path)
+        if entry.is_redirect:
+            entry = entry.get_redirect_entry()
+        content = bytes(entry.get_item().content)
+        html_str = content.decode("utf-8", errors="replace")[:80000]
+    except Exception:
+        return result
+
+    # -- Title: extract from <title> or og:title if entry.title is a slug --
+    entry_title = entry.title or ""
+    if "-" in entry_title and " " not in entry_title:
+        # Looks like a URL slug — try to extract a better title
+        for pattern in [
+            r'<meta\s+property=["\']og:title["\']\s+content=["\']([^"\']+)["\']',
+            r'<meta\s+content=["\']([^"\']+)["\']\s+property=["\']og:title["\']',
+            r'<title[^>]*>([^<]+)</title>',
+            r'<p\s+class=["\']title\s+lang-default["\'][^>]*>(.*?)</p>',
+            r'<p\s+class=["\']title["\'][^>]*>(.*?)</p>',
+            r'<h1[^>]*>(.*?)</h1>',
+        ]:
+            tm = re.search(pattern, html_str, re.IGNORECASE | re.DOTALL)
+            if tm:
+                clean_title = strip_html(html.unescape(tm.group(1).strip()))
+                # Strip site suffixes like " | TED Talk", "— The World Factbook"
+                clean_title = re.sub(r'\s*[\|–—]\s*(TED\s*Talk|TED|Wikipedia|The World Factbook).*$', '', clean_title)
+                # Strip Factbook region prefixes like "Africa :: " or "Europe :: "
+                clean_title = re.sub(r'^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s*::\s*', '', clean_title)
+                if len(clean_title) > 3 and clean_title != entry_title:
+                    result["title"] = clean_title[:200]
+                    break
+        else:
+            # No HTML title found — title-case the slug as last resort
+            result["title"] = entry_title.replace("-", " ").replace("_", " ").title()[:200]
+
+    # -- Wikiquote: extract an actual quote from <ul><li> blocks --
+    if "wikiquote" in zim_name.lower():
+        # Wikiquote structure: <ul><li>Quote text<ul><li>Attribution</li></ul></li></ul>
+        # Strategy: find <ul> blocks that contain nested <ul> (quote + attribution).
+        # Use a simple stack-based approach to find balanced top-level <ul> blocks.
+        for ul_m in re.finditer(r'<ul>', html_str):
+            start = ul_m.start()
+            # Find the matching </ul> by counting nesting depth
+            depth = 1
+            pos = ul_m.end()
+            while depth > 0 and pos < len(html_str) and pos < start + 5000:
+                next_open = html_str.find('<ul', pos)
+                next_close = html_str.find('</ul>', pos)
+                if next_close < 0:
+                    break
+                if next_open >= 0 and next_open < next_close:
+                    depth += 1
+                    pos = next_open + 3
+                else:
+                    depth -= 1
+                    pos = next_close + 5
+            if depth != 0:
+                continue
+            block = html_str[start:pos]
+            # Must have a nested <ul> (attribution) to be a quote block
+            if block.count('<ul') < 2:
+                continue
+            # Extract text before the first nested <ul> as the quote
+            inner_ul_pos = block.find('<ul', 4)  # skip the outer <ul>
+            if inner_ul_pos < 0:
+                continue
+            quote_html = block[4:inner_ul_pos]  # between outer <ul> and first nested <ul>
+            # Strip the wrapping <li> tag
+            quote_html = re.sub(r'^\s*<li[^>]*>', '', quote_html)
+            text = strip_html(quote_html).strip()
+            if 20 < len(text) < 400 and len(text.split()) > 4:
+                if text.startswith(("Category:", "See also", "External links", "Retrieved")):
+                    continue
+                result["blurb"] = "\u201c" + text[:250] + "\u201d"
+                # Attribution: prefer page title (the person being quoted).
+                # Wikiquote nested <li> is usually a citation/source, not an author name.
+                # Only override with nested text if it clearly looks like a person's name.
+                author = result.get("title") or entry_title
+                inner_block = block[inner_ul_pos:]
+                attr_raw = strip_html(inner_block).strip()
+                attr_raw = re.sub(r'^[\u2014\u2013\-~]+\s*', '', attr_raw).strip().split('\n')[0].strip()
+                if (attr_raw and 3 < len(attr_raw) < 50
+                    and not re.search(r'[\[\]{}()/]|https?:|www\.|^\d|^p\.\s', attr_raw, re.IGNORECASE)
+                    and re.match(r'^[A-Z][\w.\'\u2019-]+(\s+[A-Za-z][\w.\'\u2019-]+){0,4}$', attr_raw)):
+                    author = attr_raw
+                if author:
+                    result["attribution"] = author[:100]
+                break
+
+    # -- TED Talks: extract speaker name and photo --
+    if "ted" in zim_name.lower():
+        # <p id="speaker"> has the last name; speaker_desc has the full name in prose.
+        # Strategy: get last name, then find "FirstName LastName" in speaker_desc.
+        speaker = None
+        last_name = None
+        sp_m = re.search(r'<p\s+id=["\']speaker["\'][^>]*>(.*?)</p>', html_str, re.DOTALL | re.IGNORECASE)
+        if sp_m:
+            last_name = re.sub(r'\s+', ' ', strip_html(sp_m.group(1))).strip()
+            if ' ' in last_name:
+                # Already a full name (some playlist ZIMs have full names)
+                speaker = last_name
+        # Find full name in speaker_desc by locating the last name in context
+        if not speaker and last_name:
+            sp_desc = re.search(r'<p\s+id=["\']speaker_desc["\'][^>]*>(.*?)</p>', html_str, re.DOTALL | re.IGNORECASE)
+            if sp_desc:
+                desc_text = re.sub(r'\s+', ' ', strip_html(sp_desc.group(1))).strip()
+                # Find last name in the desc and grab preceding word(s) as first name
+                # e.g. "Biologist E.O. Wilson explored..." → find "Wilson", grab "E.O. Wilson"
+                esc_last = re.escape(last_name)
+                name_m = re.search(r'((?:(?:[A-Z][\w.\'\u2019-]*|el|de|van|von|al)\s+){0,3})' + esc_last + r'\b', desc_text)
+                if name_m:
+                    prefix = name_m.group(1).strip()
+                    if prefix:
+                        speaker = (prefix + " " + last_name).strip()
+                    else:
+                        speaker = last_name
+        if not speaker:
+            speaker = last_name  # fallback to last name if desc search failed
+        if speaker and len(speaker) > 1:
+            result["speaker"] = speaker[:100]
+        sp_img = re.search(r'<img\s+id=["\']speaker_img["\'][^>]*src=["\']([^"\']+)["\']', html_str, re.IGNORECASE)
+        if not sp_img:
+            sp_img = re.search(r'<img[^>]*id=["\']speaker_img["\'][^>]*src=["\']([^"\']+)["\']', html_str, re.IGNORECASE)
+        if sp_img:
+            src = sp_img.group(1)
+            if not src.startswith("http") and not src.startswith("//") and not src.startswith("data:"):
+                resolved = _resolve_img_path(archive, path, src)
+                if resolved:
+                    result["thumbnail"] = f"/w/{zim_name}/{resolved}"
+
+    # -- World Factbook: extract country flag image --
+    if "theworldfactbook" in zim_name.lower() and not result["thumbnail"]:
+        # Look for flag images: <img> with alt/src containing "flag"
+        for flag_m in re.finditer(r'<img\b([^>]*)>', html_str[:60000], re.IGNORECASE):
+            attrs = flag_m.group(1)
+            alt_m = re.search(r'alt=["\']([^"\']*)["\']', attrs, re.IGNORECASE)
+            src_m = re.search(r'src=["\']([^"\']+)["\']', attrs, re.IGNORECASE)
+            if not src_m:
+                continue
+            src = src_m.group(1)
+            is_flag = False
+            if alt_m and "flag" in alt_m.group(1).lower():
+                is_flag = True
+            if "flag" in src.lower():
+                is_flag = True
+            if is_flag and not src.startswith("http") and not src.startswith("//") and not src.startswith("data:"):
+                resolved = _resolve_img_path(archive, path, src)
+                if resolved:
+                    result["thumbnail"] = f"/w/{zim_name}/{resolved}"
+                    break
+
+    # -- xkcd: use comic alt-text (title attr) as blurb --
+    if "xkcd" in zim_name.lower() and not result["blurb"]:
+        for img_m in re.finditer(r'<img\b([^>]*)>', html_str, re.IGNORECASE):
+            attrs = img_m.group(1)
+            title_m = re.search(r'title=["\']([^"\']+)["\']', attrs)
+            if title_m and len(title_m.group(1).strip()) > 20:
+                text = html.unescape(title_m.group(1).strip())
+                if "license" not in text.lower() and "creative commons" not in text.lower():
+                    result["blurb"] = text[:200]
+                    break
+
+    # -- Gutenberg: extract author from dc.creator meta --
+    if "gutenberg" in zim_name.lower():
+        creator_m = re.search(r'<meta\s+content="([^"]+)"\s+name="dc\.creator"', html_str[:8000], re.IGNORECASE)
+        if not creator_m:
+            creator_m = re.search(r'<meta\s+name="dc\.creator"\s+content="([^"]+)"', html_str[:8000], re.IGNORECASE)
+        if creator_m:
+            author = creator_m.group(1).strip()
+            # Convert "Last, First, dates" → "First Last"
+            if ',' in author:
+                parts = author.split(',')
+                last = parts[0].strip()
+                first = parts[1].strip() if len(parts) > 1 else ''
+                # Skip date-like parts (e.g. "1808-1889")
+                if first and not re.match(r'^\d', first):
+                    author = first + ' ' + last
+                else:
+                    author = last
+            if author and author.lower() != 'various':
+                result["author"] = author[:100]
+
+    # -- Wiktionary: extract definition and part of speech (English only) --
+    if "wiktionary" in zim_name.lower():
+        # Only extract from the English section of the page
+        eng_m = re.search(r'<h2[^>]*id=["\']English["\']', html_str[:30000], re.IGNORECASE)
+        if eng_m:
+            # Slice from English header to next <h2> (next language section) or end
+            eng_start = eng_m.start()
+            next_h2 = re.search(r'<h2[^>]*id=', html_str[eng_start + 50:30000], re.IGNORECASE)
+            eng_end = (eng_start + 50 + next_h2.start()) if next_h2 else 30000
+            eng_section = html_str[eng_start:eng_end]
+            # Part of speech from <h3>/<h4>
+            for pos_m in re.finditer(r'<h[34][^>]*>(.*?)</h', eng_section, re.DOTALL | re.IGNORECASE):
+                pos_text = strip_html(pos_m.group(1)).strip()
+                if pos_text.lower() in ('noun', 'verb', 'adjective', 'adverb', 'pronoun', 'preposition',
+                                         'conjunction', 'interjection', 'determiner', 'particle', 'prefix', 'suffix'):
+                    result["part_of_speech"] = pos_text
+                    break
+            # Definition from first <ol><li> — skip boring inflected forms
+            _boring_def = re.compile(r'^(plural of |third-person |simple past |past participle |present participle |alternative |archaic |obsolete |misspelling |eye dialect |nonstandard )', re.IGNORECASE)
+            for def_m in re.finditer(r'<ol[^>]*>\s*<li[^>]*>(.*?)</li>', eng_section, re.DOTALL):
+                def_text = strip_html(def_m.group(1)).strip()
+                def_text = re.split(r'\n', def_text)[0].strip()
+                if len(def_text) > 5 and not def_text.startswith(('Category:', 'See also')):
+                    if _boring_def.match(def_text):
+                        result["boring"] = True  # signal to retry
+                    else:
+                        result["blurb"] = def_text[:200]
+                    break
+        else:
+            # No English section — flag for the random endpoint to skip
+            result["non_english"] = True
+
+    # -- Blurb: og:description > meta description > first <p> --
+    if not result["blurb"]:
+        for pattern in [
+            r'<meta\s+property=["\']og:description["\']\s+content=["\']([^"\']+)["\']',
+            r'<meta\s+content=["\']([^"\']+)["\']\s+property=["\']og:description["\']',
+            r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)["\']',
+            r'<meta\s+content=["\']([^"\']+)["\']\s+name=["\']description["\']',
+        ]:
+            m = re.search(pattern, html_str, re.IGNORECASE)
+            if m and len(m.group(1).strip()) > 20:
+                result["blurb"] = html.unescape(m.group(1).strip())[:200]
+                break
+    if not result["blurb"]:
+        # First substantial <p> text (skip tiny nav/footer paragraphs and boilerplate)
+        _skip_blurb = re.compile(r'(Creative Commons|This work is licensed|free to copy and share|All rights reserved|Copyright \d|DMCA)', re.IGNORECASE)
+        for pm in re.finditer(r'<p\b[^>]*>(.*?)</p>', html_str, re.DOTALL | re.IGNORECASE):
+            text = strip_html(pm.group(1))
+            if len(text) > 40 and not _skip_blurb.search(text):
+                result["blurb"] = text[:200]
+                break
+
+    # -- Thumbnail: og:image > twitter:image > largest content image --
+    # Skip if already extracted (e.g., TED speaker photo, country flag)
+    if result["thumbnail"]:
+        return result
+    for pattern in [
+        r'<meta\s+property=["\']og:image["\']\s+content=["\']([^"\']+)["\']',
+        r'<meta\s+content=["\']([^"\']+)["\']\s+property=["\']og:image["\']',
+        r'<meta\s+name=["\']twitter:image["\']\s+content=["\']([^"\']+)["\']',
+        r'<meta\s+content=["\']([^"\']+)["\']\s+name=["\']twitter:image["\']',
+    ]:
+        m = re.search(pattern, html_str, re.IGNORECASE)
+        if m:
+            src = m.group(1)
+            if src.startswith("http://") or src.startswith("https://") or src.startswith("//"):
+                continue  # external URL, can't serve from ZIM
+            if not src.lower().endswith(".svg"):
+                resolved = _resolve_img_path(archive, path, src)
+                if resolved:
+                    result["thumbnail"] = f"/w/{zim_name}/{resolved}"
+                    return result
+
+    # Fall back to best content image using scoring heuristics:
+    # - Penalize banners (aspect ratio > 4:1)
+    # - Prefer images with meaningful alt text (content images)
+    # - Images without explicit dimensions are likely content (generous default)
+    # - Skip images in header/nav/footer chrome
+    best_img = None
+    best_score = 0
+    for m in re.finditer(r'<img\b([^>]*)>', html_str, re.IGNORECASE):
+        attrs = m.group(1)
+        src_m = re.search(r'src=["\']([^"\']+)["\']', attrs)
+        if not src_m:
+            continue
+        src = src_m.group(1)
+        if src.startswith("data:") or src.startswith("http") or src.startswith("//"):
+            continue
+        if src.lower().endswith(".svg") or src.lower().endswith(".svg.png"):
+            continue
+        w_m = re.search(r'width=["\']?(\d+)', attrs)
+        h_m = re.search(r'height=["\']?(\d+)', attrs)
+        has_dims = bool(w_m or h_m)
+        w = int(w_m.group(1)) if w_m else 400  # no attrs → assume large content
+        h = int(h_m.group(1)) if h_m else 300
+        if w < 50 or h < 50:
+            continue
+        # Skip images inside header/nav/footer
+        ctx_start = max(0, m.start() - 300)
+        ctx = html_str[ctx_start:m.start()].lower()
+        if re.search(r'<(header|nav|footer)\b', ctx) and not re.search(r'</(header|nav|footer)>', ctx):
+            continue
+        # Score: area + bonuses for content signals
+        area = w * h
+        ratio = max(w, h) / max(min(w, h), 1)
+        score = area
+        if ratio > 4:
+            score *= 0.2  # heavy penalty for banners
+        alt_m = re.search(r'alt=["\']([^"\']+)["\']', attrs)
+        if alt_m and len(alt_m.group(1)) > 3:
+            alt_lower = alt_m.group(1).lower()
+            if alt_lower not in ("logo", "icon", "banner", "spacer"):
+                score *= 1.5  # bonus for meaningful alt text
+        if not has_dims:
+            score *= 1.3  # content images often omit dimensions
+        if score > best_score:
+            resolved = _resolve_img_path(archive, path, src)
+            if resolved:
+                best_img = f"/w/{zim_name}/{resolved}"
+                best_score = score
+
+    result["thumbnail"] = best_img
+    return result
 
 
 def suggest(query_str, zim_name=None, limit=10):
@@ -1659,6 +2400,9 @@ def load_cache(force=False):
         print(f"  Cache built: {len(info)} ZIMs scanned in {elapsed:.1f}s", flush=True)
     else:
         print(f"  Cache loaded: {len(info)} ZIMs from disk cache in {elapsed:.1f}s", flush=True)
+
+    # Rebuild domain map whenever ZIM list changes
+    _build_domain_zim_map()
 
 
 # ── Library Management (gated by ZIMI_MANAGE=1) ──
@@ -2218,6 +2962,8 @@ class ZimHandler(BaseHTTPRequestHandler):
                 if not zim or not path:
                     return self._json(400, {"error": "missing ?zim= and ?path= parameters"})
                 t0 = time.time()
+                snippet = ""
+                thumbnail = None
                 with _zim_lock:
                     archive = get_archive(zim)
                     if archive is None:
@@ -2226,16 +2972,72 @@ class ZimHandler(BaseHTTPRequestHandler):
                         entry = archive.get_entry_by_path(path)
                         item = entry.get_item()
                         if item.size > MAX_CONTENT_BYTES:
+                            _record_metric("/snippet", time.time() - t0)
                             return self._json(200, {"snippet": ""})
-                        # Only read first 10KB for snippet extraction
-                        raw = bytes(item.content)[:10240]
+                        # Read first 15KB — enough for <head> meta tags + initial content
+                        raw = bytes(item.content)[:15360]
                         text = raw.decode("UTF-8", errors="replace")
-                        plain = strip_html(text)
-                        snippet = plain[:300].strip()
+                        # Prefer meta description (skips nav/header boilerplate)
+                        for desc_pat in [
+                            r'<meta\s+(?:name|property)=["\'](?:og:)?description["\']\s+content=["\']([^"\']{20,})["\']',
+                            r'<meta\s+content=["\']([^"\']{20,})["\']\s+(?:name|property)=["\'](?:og:)?description["\']',
+                        ]:
+                            desc_m = re.search(desc_pat, text[:8000], re.IGNORECASE)
+                            if desc_m:
+                                snippet = strip_html(desc_m.group(1))[:300].strip()
+                                break
+                        # Fallback: extract from <main> or <article> body (skip nav boilerplate)
+                        if not snippet:
+                            for tag in ['main', 'article']:
+                                tag_m = re.search(r'<' + tag + r'[\s>]', text, re.IGNORECASE)
+                                if tag_m:
+                                    plain = strip_html(text[tag_m.start():])
+                                    snippet = plain[:300].strip()
+                                    break
+                        # Last resort: full page text
+                        if not snippet:
+                            snippet = strip_html(text)[:300].strip()
+                        # Lightweight thumbnail: og:image / twitter:image from <head>
+                        for img_pat in [
+                            r'<meta\s+property=["\']og:image["\']\s+content=["\']([^"\']+)["\']',
+                            r'<meta\s+content=["\']([^"\']+)["\']\s+property=["\']og:image["\']',
+                            r'<meta\s+name=["\']twitter:image["\']\s+content=["\']([^"\']+)["\']',
+                            r'<meta\s+content=["\']([^"\']+)["\']\s+name=["\']twitter:image["\']',
+                        ]:
+                            img_m = re.search(img_pat, text[:8000], re.IGNORECASE)
+                            if img_m:
+                                src = img_m.group(1)
+                                if not src.startswith(("http", "//", "data:")) and not src.lower().endswith(".svg"):
+                                    resolved = _resolve_img_path(archive, path, src)
+                                    if resolved:
+                                        thumbnail = f"/w/{zim}/{resolved}"
+                                        break
+                        # Fallback: first substantial <img> in content
+                        if not thumbnail:
+                            for img_m2 in re.finditer(r'<img\b([^>]*)>', text[:10000], re.IGNORECASE):
+                                attrs = img_m2.group(1)
+                                src_m = re.search(r'src=["\']([^"\']+)["\']', attrs)
+                                if not src_m:
+                                    continue
+                                src = src_m.group(1)
+                                if src.startswith(("data:", "http", "//")) or src.lower().endswith(".svg"):
+                                    continue
+                                w_m = re.search(r'width=["\']?(\d+)', attrs)
+                                h_m = re.search(r'height=["\']?(\d+)', attrs)
+                                w = int(w_m.group(1)) if w_m else 200
+                                h = int(h_m.group(1)) if h_m else 150
+                                if w >= 60 and h >= 40:
+                                    resolved = _resolve_img_path(archive, path, src)
+                                    if resolved:
+                                        thumbnail = f"/w/{zim}/{resolved}"
+                                        break
                     except (KeyError, Exception):
-                        snippet = ""
+                        pass
                 _record_metric("/snippet", time.time() - t0)
-                return self._json(200, {"snippet": snippet})
+                result = {"snippet": snippet}
+                if thumbnail:
+                    result["thumbnail"] = thumbnail
+                return self._json(200, result)
 
             elif parsed.path == "/collections":
                 data = _load_collections()
@@ -2256,19 +3058,104 @@ class ZimHandler(BaseHTTPRequestHandler):
                     if not eligible:
                         return self._json(200, {"error": "no ZIMs available"})
                     pick_name = _random.choice(eligible)["name"]
+                want_thumb = param("thumb") == "1"
+                require_thumb = param("require_thumb") == "1"
+                is_wiktionary = "wiktionary" in pick_name.lower()
+                max_tries = 50 if is_wiktionary else (5 if require_thumb else 1)
                 t0 = time.time()
                 with _zim_lock:
                     archive = get_archive(pick_name)
                     if archive is None:
                         return self._json(200, {"error": "archive not available"})
-                    result = random_entry(archive)
-                if not result:
+                    date_param = param("date")  # MMDD format
+                    seed_param = param("seed")  # For deterministic daily picks
+                    rng = None
+                    if seed_param:
+                        import hashlib
+                        seed_val = int(hashlib.md5((pick_name + seed_param).encode()).hexdigest()[:8], 16)
+                        rng = _random.Random(seed_val)
+                    best_result = None
+                    best_preview = None
+                    for _try in range(max_tries):
+                        result = None
+                        if date_param and len(date_param) == 4 and _try == 0:
+                            result = _get_dated_entry(archive, pick_name, date_param, rng=rng)
+                        if not result:
+                            result = random_entry(archive, rng=rng)
+                        if not result:
+                            continue
+                        preview = None
+                        if want_thumb:
+                            preview = _extract_preview(archive, pick_name, result["path"])
+                        # Skip non-English or boring wiktionary entries (retry)
+                        if is_wiktionary and preview and (preview.get("non_english") or preview.get("boring")):
+                            if best_result is None:
+                                best_result = result
+                                best_preview = preview
+                            continue
+                        # Wiktionary: accept interesting English entry even without thumbnail
+                        if is_wiktionary and preview and not preview.get("non_english") and not preview.get("boring"):
+                            best_result = result
+                            best_preview = preview
+                            break
+                        if not require_thumb or (preview and preview["thumbnail"]):
+                            best_result = result
+                            best_preview = preview
+                            break
+                        # Keep first result as fallback even without image
+                        if best_result is None:
+                            best_result = result
+                            best_preview = preview
+                if not best_result:
                     return self._json(200, {"error": "no articles found"})
                 dt = time.time() - t0
-                chosen = {"zim": pick_name, "path": result["path"], "title": result["title"]}
+                chosen = {"zim": pick_name, "path": best_result["path"], "title": best_result["title"]}
+                if best_preview:
+                    # Use extracted title if the entry title looks like a slug
+                    if best_preview.get("title"):
+                        chosen["title"] = best_preview["title"]
+                    if best_preview["thumbnail"]:
+                        chosen["thumbnail"] = best_preview["thumbnail"]
+                    if best_preview["blurb"]:
+                        chosen["blurb"] = best_preview["blurb"]
+                    if best_preview.get("attribution"):
+                        chosen["attribution"] = best_preview["attribution"]
+                    if best_preview.get("speaker"):
+                        chosen["speaker"] = best_preview["speaker"]
+                    if best_preview.get("author"):
+                        chosen["author"] = best_preview["author"]
+                    if best_preview.get("part_of_speech"):
+                        chosen["part_of_speech"] = best_preview["part_of_speech"]
+                # XKCD date lookup from archive page (available for clients that want it)
+                # Must hold _zim_lock — _xkcd_date_lookup reads ZIM entries via libzim C API
+                if "xkcd" in pick_name.lower() and param("with_date") == "1":
+                    with _zim_lock:
+                        xkcd_date = _xkcd_date_lookup(archive, best_result["path"])
+                    if xkcd_date:
+                        chosen["date"] = xkcd_date
                 _record_metric("/random", dt)
-                log.info("random zim=%s title=%r %.1fs", pick_name, result["title"], dt)
+                log.info("random zim=%s title=%r %.1fs", pick_name, best_result["title"], dt)
                 return self._json(200, chosen)
+
+            elif parsed.path == "/resolve":
+                # Cross-ZIM URL resolution: given an external URL, find matching ZIM + path
+                # Also serves the domain map when ?domains=1 is set
+                if param("domains") == "1":
+                    return self._json(200, _domain_zim_map)
+                url_param = param("url")
+                if not url_param:
+                    return self._json(400, {"error": "missing ?url= parameter"})
+                with _zim_lock:
+                    result = _resolve_url_to_zim(url_param)
+                if result:
+                    # Track cross-ZIM reference if source ZIM provided
+                    from_zim = param("from")
+                    if from_zim and from_zim != result["zim"]:
+                        key = (from_zim, result["zim"])
+                        with _xzim_refs_lock:
+                            _xzim_refs[key] = _xzim_refs.get(key, 0) + 1
+                    return self._json(200, {"found": True, **result})
+                return self._json(200, {"found": False})
 
             elif parsed.path.startswith("/manage/"):
                 if not ZIMI_MANAGE:
@@ -2282,10 +3169,13 @@ class ZimHandler(BaseHTTPRequestHandler):
                 if parsed.path == "/manage/status":
                     zim_count = len(get_zim_files())
                     total_gb = sum(z.get("size_gb", 0) for z in (_zim_list_cache or []))
+                    linked_zims = len(set(_domain_zim_map.values()))
                     return self._json(200, {
                         "zim_count": zim_count,
                         "total_size_gb": round(total_gb, 1),
                         "manage_enabled": True,
+                        "linked_zims": linked_zims,
+                        "domain_count": len(_domain_zim_map),
                         "auto_update": {
                             "enabled": _auto_update_enabled,
                             "frequency": _auto_update_freq,
@@ -2302,14 +3192,21 @@ class ZimHandler(BaseHTTPRequestHandler):
                         "last_check": _auto_update_last_check,
                     }
                     title_index = _get_title_index_stats()
-                    return self._json(200, {"metrics": metrics, "disk": disk, "auto_update": auto_update, "title_index": title_index})
+                    with _xzim_refs_lock:
+                        xzim_refs = sorted(
+                            [{"from": k[0], "to": k[1], "count": v} for k, v in _xzim_refs.items()],
+                            key=lambda x: x["count"], reverse=True
+                        )
+                    linked_zims = len(set(_domain_zim_map.values()))
+                    zim_count = len(get_zim_files())
+                    return self._json(200, {"metrics": metrics, "disk": disk, "auto_update": auto_update, "title_index": title_index, "cross_zim_refs": xzim_refs, "linked_zims": linked_zims, "zim_count": zim_count, "domain_count": len(_domain_zim_map)})
 
                 elif parsed.path == "/manage/usage":
                     return self._json(200, _get_usage_stats())
 
                 elif parsed.path == "/manage/catalog":
                     query = param("q", "")
-                    lang = param("lang", "eng")
+                    lang = param("lang", "")
                     try:
                         count = min(int(param("count", "20")), 500)
                     except (ValueError, TypeError):
@@ -2408,7 +3305,24 @@ class ZimHandler(BaseHTTPRequestHandler):
                 if _check_manage_auth(self):
                     return self._json(401, {"error": "unauthorized", "needs_password": True})
 
-            if parsed.path == "/collections":
+            if parsed.path == "/resolve":
+                # Batch cross-ZIM URL resolution: POST {"urls": [...]} → {"results": {...}}
+                urls = data.get("urls", [])
+                if not isinstance(urls, list) or len(urls) > 50:
+                    return self._json(400, {"error": "'urls' must be a list (max 50)"})
+                results = {}
+                with _zim_lock:
+                    for url_str in urls:
+                        if not isinstance(url_str, str):
+                            continue
+                        resolved = _resolve_url_to_zim(url_str)
+                        if resolved:
+                            results[url_str] = {"found": True, "zim": resolved["zim"], "path": resolved["path"]}
+                        else:
+                            results[url_str] = {"found": False}
+                return self._json(200, {"results": results})
+
+            elif parsed.path == "/collections":
                 # Auth: only enforce password when manage mode is on (collections are
                 # user-facing features that work without manage mode enabled)
                 if ZIMI_MANAGE and _check_manage_auth(self):
@@ -2653,21 +3567,45 @@ class ZimHandler(BaseHTTPRequestHandler):
 
             try:
                 entry = archive.get_entry_by_path(entry_path)
-                if entry.is_redirect:
-                    entry = entry.get_redirect_entry()
             except KeyError:
+                entry = None
+            if entry is None:
+                # Old namespace fallback: try stripping or adding A/, I/, C/, -/ prefixes
+                for alt in _namespace_fallbacks(entry_path):
+                    try:
+                        entry = archive.get_entry_by_path(alt)
+                        break
+                    except KeyError:
+                        continue
+            if entry is None:
                 return self._json(404, {"error": f"Entry '{entry_path}' not found in {zim_name}"})
+
+            # ZIM redirects → HTTP 302 so browser URL updates to canonical path
+            if entry.is_redirect:
+                target = entry.get_redirect_entry()
+                target_path = target.path
+                self.send_response(302)
+                self.send_header("Location", f"/w/{zim_name}/{target_path}")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
 
             item = entry.get_item()
             total_size = item.size
             mimetype = item.mimetype or ""
 
+            ext = os.path.splitext(entry_path)[1].lower()
             if not mimetype:
-                ext = os.path.splitext(entry_path)[1].lower()
                 mimetype = MIME_FALLBACK.get(ext, "application/octet-stream")
-            # Fix zimgit packaging bug: PDFs stored with text/html mimetype
-            if entry_path.lower().endswith(".pdf") and mimetype != "application/pdf":
-                mimetype = "application/pdf"
+            # Bare MIME fix: some ZIMs store "mp4" instead of "video/mp4"
+            if mimetype and "/" not in mimetype:
+                guessed = MIME_FALLBACK.get("." + mimetype.lower())
+                mimetype = guessed if guessed else "application/octet-stream"
+            # Fix ZIM packaging bugs: media files stored with wrong mimetype (e.g. text/html)
+            # Trust the file extension for known media/binary types over the ZIM metadata
+            ext_mime = MIME_FALLBACK.get(ext)
+            if ext_mime and mimetype == "text/html" and ext not in (".html", ".htm"):
+                mimetype = ext_mime
             # Force EPUB download (browsers can't render EPUB inline)
             is_epub = entry_path.lower().endswith(".epub") or mimetype in ("application/epub+zip", "application/epub")
             if is_epub:
@@ -2733,6 +3671,13 @@ class ZimHandler(BaseHTTPRequestHandler):
 
         if is_streamable:
             self.send_header("Accept-Ranges", "bytes")
+
+        # Sandbox ZIM HTML: allow inline styles/scripts (ZIM content uses them)
+        # but block external requests and prevent framing outside Zimi
+        if mimetype.startswith("text/html"):
+            self.send_header("Content-Security-Policy",
+                "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; "
+                "frame-ancestors 'self'")
 
         # Gzip text-based content only (images/PDFs are already compressed)
         compressible = any(mimetype.startswith(t) or mimetype == t for t in COMPRESSIBLE_TYPES)

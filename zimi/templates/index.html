@@ -23,8 +23,8 @@
     font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
   }
 
-  html { height: 100%; overflow: hidden; }
-  body { background: var(--bg); color: var(--text); height: 100%; padding-top: 56px; overflow-y: auto; overscroll-behavior-y: none; }
+  html { height: 100%; overflow-y: auto; overscroll-behavior-y: none; }
+  body { background: var(--bg); color: var(--text); min-height: 100%; padding-top: 56px; overflow: visible; }
 
   /* ── Topbar ── */
   .topbar {
@@ -234,7 +234,7 @@
 
   .results { display: flex; flex-direction: column; gap: 3px; }
   .result {
-    padding: 14px 16px; background: var(--surface); border-radius: var(--radius);
+    display: flex; gap: 12px; padding: 14px 16px; background: var(--surface); border-radius: var(--radius);
     cursor: pointer; border: 1px solid transparent;
     transition: all 0.2s; opacity: 0; animation: fadeUp 0.3s ease forwards;
   }
@@ -243,6 +243,13 @@
     box-shadow: 0 2px 12px var(--amber-glow);
     transform: translateX(4px); outline: none;
   }
+  .result-thumb {
+    flex-shrink: 0; width: 72px; height: 72px; border-radius: 8px; overflow: hidden;
+    background: var(--surface2); display: none; align-self: center;
+  }
+  .result-thumb.loaded { display: block; }
+  .result-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .result-body { flex: 1; min-width: 0; }
   .result-source {
     display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
   }
@@ -431,7 +438,14 @@
     border-radius: var(--radius); transition: all 0.2s;
   }
   .ci-add-btn:hover { border-color: var(--amber-border); background: var(--amber-glow); }
-  .ci-variants { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .ci-variants { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; align-items: center; }
+  .ci-flavor-row { flex-wrap: nowrap; }
+  .ci-flavor-select {
+    padding: 4px 8px; font-size: 11px; background: var(--surface2); color: var(--text);
+    border: 1px solid var(--border); border-radius: var(--radius); outline: none; cursor: pointer;
+    max-width: 160px;
+  }
+  .ci-flavor-select:focus { border-color: var(--amber-border); }
   .ci-variant-btn {
     padding: 3px 10px; font-size: 11px; font-weight: 500; cursor: pointer;
     background: var(--surface2); color: var(--text2); border: 1px solid var(--border);
@@ -514,9 +528,41 @@
 
   /* ── Browse category gallery ── */
   .browse-gallery { }
+
+  /* ── Featured Living Carousel ── */
+  .featured-section { margin-bottom: 20px; }
+  .featured-scroll { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
+  .featured-card {
+    flex: 1 1 calc(50% - 4px); min-width: 200px; max-width: 100%;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden; display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .featured-card:hover { border-color: var(--amber-border); background: var(--surface2); transform: translateY(-1px); box-shadow: 0 4px 24px var(--amber-glow); }
+  .fc-promo { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+  .fc-promo-icon { font-size: 20px; flex-shrink: 0; }
+  .fc-promo-label { font-size: 13px; font-weight: 600; color: var(--accent); }
+  .fc-promo-tagline { font-size: 11px; color: var(--text2); }
+  .fc-promo-unlock { font-size: 10px; color: var(--amber); opacity: 0.8; }
+  .fc-actions { display: flex; flex-wrap: nowrap; gap: 4px; flex-shrink: 0; align-items: center; }
+  .fc-flavor-select {
+    padding: 4px 8px; font-size: 11px; background: var(--surface2); color: var(--text);
+    border: 1px solid var(--border); border-radius: var(--radius); outline: none; cursor: pointer;
+  }
+  .fc-flavor-select:focus { border-color: var(--amber-border); }
+  .fc-pack { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; margin-bottom: 10px; background: linear-gradient(135deg, rgba(232,168,56,0.08), rgba(232,168,56,0.02)); border: 1px solid var(--amber-border); border-radius: var(--radius); }
+  .fc-pack-label { font-size: 13px; color: var(--text); font-weight: 600; }
+  .fc-pack-btn { white-space: nowrap; }
+  .browse-footer { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 20px 0 4px; color: var(--text2); font-size: 13px; }
+  .browse-footer-count { text-align: center; }
+  .browse-footer-lang select {
+    max-width: 180px; padding: 6px 10px; font-size: 13px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    color: var(--text); outline: none; cursor: pointer;
+  }
+  .browse-footer-lang select:focus { border-color: var(--amber-border); box-shadow: 0 0 0 2px var(--amber-glow); }
   .browse-header { text-align: center; margin-bottom: 24px; }
   .browse-title { font-size: 18px; font-weight: 600; color: var(--accent); margin-bottom: 4px; }
-  .browse-subtitle { font-size: 13px; color: var(--text2); }
   .browse-grid {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px;
   }
@@ -727,6 +773,148 @@
   }
   .coll-item .coll-del:hover { opacity: 1; color: #f44; border-color: #f44; }
 
+  /* ── History panel ── */
+  .bookmark-btn {
+    display: none; align-items: center; justify-content: center;
+    color: var(--text2); text-decoration: none; flex-shrink: 0;
+    padding: 6px 10px; border-radius: var(--radius); transition: all 0.2s;
+    border: 1px solid transparent; font-size: 16px; cursor: pointer; background: none;
+  }
+  .bookmark-btn:hover { color: var(--amber); border-color: var(--amber-border); background: var(--amber-glow); }
+  .bookmark-btn.bookmarked { color: var(--amber); }
+  .bookmark-btn.bookmarked svg { fill: var(--amber); }
+  .history-btn {
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text2); text-decoration: none; flex-shrink: 0;
+    padding: 6px 10px; border-radius: var(--radius); transition: all 0.2s;
+    border: 1px solid transparent; font-size: 16px; cursor: pointer; background: none;
+  }
+  .history-btn:hover { color: var(--amber); border-color: var(--amber-border); background: var(--amber-glow); }
+  .history-panel {
+    display: none; position: fixed; top: 56px; right: 0; bottom: 0; width: 360px; max-width: 100vw;
+    background: var(--surface); border-left: 1px solid var(--border); z-index: 180;
+    overflow-y: auto; box-shadow: -4px 0 24px rgba(0,0,0,0.4);
+  }
+  .history-panel.open { display: block; }
+  .history-panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px; border-bottom: 1px solid var(--border); position: sticky; top: 0;
+    background: var(--surface); z-index: 1;
+  }
+  .history-panel-header h3 { font-size: 14px; font-weight: 600; color: var(--text); margin: 0; }
+  .hp-clear { background: none; border: 1px solid var(--border); border-radius: var(--radius); color: var(--text2); font-size: 12px; padding: 4px 10px; cursor: pointer; transition: all 0.15s; }
+  .hp-clear:hover { color: #ef4444; border-color: #ef4444; }
+  .hp-group { padding: 0 16px; }
+  .hp-group-label { font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; padding: 12px 0 6px; }
+  .hp-item {
+    display: flex; align-items: center; gap: 10px; padding: 8px 0;
+    cursor: pointer; transition: opacity 0.15s; border-bottom: 1px solid var(--border);
+  }
+  .hp-item:last-child { border-bottom: none; }
+  .hp-item:hover { opacity: 0.8; }
+  .hp-icon { flex-shrink: 0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px; background: var(--surface2); font-size: 14px; }
+  .hp-icon img { width: 20px; height: 20px; border-radius: 3px; }
+  .hp-detail { flex: 1; min-width: 0; }
+  .hp-title { font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hp-sub { font-size: 11px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hp-item-del {
+    opacity: 0; background: none; border: none; color: var(--text2); font-size: 14px; cursor: pointer;
+    padding: 2px 6px; border-radius: 4px; transition: all 0.15s; flex-shrink: 0; line-height: 1;
+  }
+  .hp-item:hover .hp-item-del { opacity: 0.4; }
+  .hp-item-del:hover { opacity: 1 !important; color: #ef4444; }
+  .hp-empty { padding: 32px 16px; text-align: center; color: var(--text2); font-size: 13px; }
+
+  /* ── Bookmarks section on home ── */
+  .bookmarks-section { margin-bottom: 20px; }
+  .bookmarks-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 6px;
+  }
+  .bookmark-card {
+    display: flex; gap: 10px; align-items: center; padding: 10px 14px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    cursor: pointer; transition: all 0.2s; overflow: hidden;
+  }
+  .bookmark-card:hover { background: var(--surface2); border-color: var(--amber-border); }
+  .bookmark-card .bk-icon { flex-shrink: 0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; }
+  .bookmark-card .bk-icon img { width: 24px; height: 24px; border-radius: 4px; background: #fff; }
+  .bookmark-card .bk-detail { flex: 1; min-width: 0; }
+  .bookmark-card .bk-title { font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+  .bookmark-card .bk-source { font-size: 11px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bookmark-card .bk-remove {
+    opacity: 0; flex-shrink: 0; background: none; border: none; color: var(--text2);
+    font-size: 14px; cursor: pointer; padding: 2px 4px; border-radius: 4px; transition: all 0.15s;
+  }
+  .bookmark-card:hover .bk-remove { opacity: 0.4; }
+  .bookmark-card .bk-remove:hover { opacity: 1; color: #ef4444; }
+
+  /* ── Discover homepage — horizontal scroll row ── */
+  .discover-section { margin-bottom: 20px; }
+  .discover-label {
+    font-size: 13px; font-weight: 600; color: var(--text2); text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .dc-dismiss {
+    background: none; border: none; color: var(--text2); font-size: 16px; cursor: pointer;
+    padding: 0 4px; opacity: 0.4; transition: opacity 0.2s; line-height: 1;
+  }
+  .dc-dismiss:hover { opacity: 1; color: var(--text); }
+  .dc-teaser {
+    padding: 16px 20px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); font-size: 13px; color: var(--text2); line-height: 1.5;
+  }
+  .dc-teaser a { color: var(--amber); text-decoration: none; font-weight: 500; display: inline-block; margin-top: 8px; }
+  .dc-teaser a:hover { text-decoration: underline; }
+  .discover-scroll { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; padding: 8px 2px; margin: -8px -2px; }
+  .discover-scroll::-webkit-scrollbar { height: 4px; }
+  .discover-scroll::-webkit-scrollbar-track { background: transparent; }
+  .discover-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .discover-card {
+    flex: 0 0 260px; scroll-snap-align: start;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden; display: flex; flex-direction: column;
+  }
+  .discover-card:hover {
+    background: var(--surface2); border-color: var(--amber-border);
+    box-shadow: 0 4px 24px var(--amber-glow), 0 0 0 1px var(--amber-glow);
+    transform: translateY(-2px);
+  }
+  .discover-card.dc-no-click { cursor: default; }
+  .discover-card.dc-no-click:hover { background: var(--surface); border-color: var(--border); box-shadow: none; transform: none; }
+  .dc-thumb { width: 100%; height: 120px; object-fit: cover; display: block; background: var(--surface2); }
+  .dc-body { padding: 8px 12px 10px; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .dc-source { font-size: 11px; color: var(--text2); display: flex; align-items: center; gap: 6px; }
+  .dc-zim-icon { width: 16px; height: 16px; border-radius: 3px; background: #fff; flex-shrink: 0; }
+  .dc-source span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dc-date { font-size: 11px; color: var(--text2); margin-left: auto; flex-shrink: 0; }
+  .dc-title { font-size: 13px; color: var(--text); font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3; }
+  .dc-blurb { font-size: 11px; color: var(--text2); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .dc-blurb.dc-quote { font-style: italic; color: var(--text); font-weight: 500; font-size: 13px; -webkit-line-clamp: 8; line-height: 1.5; flex: 1; }
+  .dc-quote-card { display: flex; flex-direction: column; }
+  .dc-quote-card .dc-body { padding: 14px; gap: 6px; flex: 1; justify-content: space-between; }
+  .dc-quote-card .dc-header { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text2); }
+  .dc-quote-card .dc-attribution { font-size: 11px; color: var(--text2); margin-top: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dc-speaker { font-size: 11px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dc-icon-thumb { width: 100%; height: 120px; display: flex; align-items: center; justify-content: center; background: var(--surface2); }
+  .dc-icon-thumb img { width: 48px; height: 48px; opacity: 0.6; }
+  .dc-dice { font-size: 12px; flex-shrink: 0; opacity: 0.7; }
+  /* ── Today card — moon phase + star field ── */
+  .dc-today { width: 100%; height: 120px; position: relative; background: linear-gradient(135deg, #0a0e1a 0%, #141c2e 50%, #0d1220 100%); overflow: hidden; }
+  .dc-star { position: absolute; width: 2px; height: 2px; background: #fff; border-radius: 50%; animation: dc-twinkle 3s ease-in-out infinite; }
+  @keyframes dc-twinkle { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+  .dc-moon-wrap { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 48px; height: 48px; }
+  .dc-moon { width: 48px; height: 48px; border-radius: 50%; background: #e8e0d0; position: absolute; top: 0; left: 0; }
+  .dc-moon-shadow { width: 48px; height: 48px; border-radius: 50%; background: #0a0e1a; position: absolute; top: 0; left: 0; transition: transform 0.3s; }
+  .dc-moon-glow { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 64px; height: 64px; border-radius: 50%; background: radial-gradient(circle, rgba(232,224,208,0.15) 0%, transparent 70%); }
+  .dc-today-text { position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; font-size: 10px; color: rgba(255,255,255,0.5); line-height: 1.3; }
+  /* ── Discover loading skeletons ── */
+  .dc-loading { pointer-events: none; }
+  .dc-skel { background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%); background-size: 200% 100%; animation: dc-shimmer 1.5s ease-in-out infinite; }
+  .dc-skel-line { height: 12px; border-radius: 4px; background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%); background-size: 200% 100%; animation: dc-shimmer 1.5s ease-in-out infinite; margin-bottom: 6px; }
+  @keyframes dc-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
   /* ── Reduced motion ── */
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
@@ -750,10 +938,14 @@
     <div id="suggest-dropdown" class="suggest-dropdown"></div>
   </div>
   <a href="#" id="random-btn" class="random-btn" title="Random article (R)" onclick="randomArticle(event)"><span class="dice">&#x1F3B2;</span></a>
+  <button id="bookmark-btn" class="bookmark-btn" title="Bookmark (B)" onclick="toggleBookmark()" style="display:none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+  <button id="history-btn" class="history-btn" title="History (H)" onclick="toggleHistoryPanel()" style="display:none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></button>
   <a href="#" id="manage-btn" class="manage-btn" title="Library Manager" onclick="toggleManage(event)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></a>
-  <a id="newtab-btn" class="newtab-btn" href="#" target="_blank" rel="noopener" title="Open in new tab"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>
+  <a id="newtab-btn" class="newtab-btn" href="#" target="_blank" rel="noopener" title="Open in browser" onclick="event.preventDefault();_openInBrowser()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>
 
 </nav>
+
+<div id="history-panel" class="history-panel"></div>
 
 <div id="pw-overlay" class="pw-overlay" onclick="if(event.target===this)closePwModal()">
   <form class="pw-box" onsubmit="event.preventDefault();submitPw()" autocomplete="off">
@@ -804,6 +996,10 @@
     <div class="field-row" id="settings-port-row">
       <input type="number" id="settings-port" min="1024" max="65535" value="8899">
     </div>
+    <label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;cursor:pointer;text-transform:none;letter-spacing:0">
+      <input type="checkbox" id="settings-discover" onchange="if(this.checked)localStorage.removeItem('zimi_hide_discover');else localStorage.setItem('zimi_hide_discover','1')" style="accent-color:var(--amber)">
+      <span style="font-size:13px;color:var(--text)">Show Discover on home page</span>
+    </label>
     <div class="hint" id="settings-hint">Changes require a server restart to take effect.</div>
     <div id="settings-browser-link" style="display:none;margin-top:8px;margin-bottom:16px;padding:12px 14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius)">
       <div style="display:flex;align-items:center;justify-content:space-between">
@@ -862,6 +1058,7 @@ let sourceAutoReader = false; // true when enterSource auto-opened the reader (n
 let _popstateNoAutoReader = false; // suppress auto-reader on popstate navigation
 let articleHistory = []; // [{zim, path, title, timestamp}] — max 50 entries
 let currentArticle = null; // {zim, path} — what's currently in the reader
+let _domainZimMap = {}; // {domain: zim_name} — for cross-ZIM link classification
 let zimsCache = null;
 let manageEnabled = false;
 let activeCategories = new Set();
@@ -1014,6 +1211,8 @@ function updateTopbar() {
 
   newtabBtn.style.display = readerOpen ? 'flex' : 'none';
   randomBtn.style.display = 'flex';
+  document.getElementById('history-btn').style.display = (mode !== 'manage') ? 'flex' : 'none';
+  _updateBookmarkBtn();
 
   // Search placeholder
   if (currentSource) {
@@ -1082,6 +1281,11 @@ async function init() {
       const hdata = await hres.json();
       if (hdata.version) document.getElementById('footer-version').textContent = hdata.version + ' ';
     }
+  } catch(e) {}
+  // Fetch domain→ZIM map for cross-ZIM navigation + link highlighting
+  try {
+    const dres = await fetch('/resolve?domains=1');
+    if (dres.ok) _domainZimMap = await dres.json();
   } catch(e) {}
   // Set initial history state so browser back always has a valid SPA state
   if (!history.state) history.replaceState({ mode: 'home' }, '', location.href);
@@ -1155,15 +1359,46 @@ function route(push) {
   enterHome(push);
 }
 
+// ── Open in browser (escape PWA standalone mode) ──
+function _openInBrowser() {
+  var url = location.href;
+  var isPWA = window.matchMedia('(display-mode:standalone)').matches || navigator.standalone;
+  if (isPWA) {
+    // iOS PWA can't window.open to Safari — copy URL to clipboard instead
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function() {
+        var toast = document.createElement('div');
+        toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;font-size:13px;color:var(--text2);z-index:300;box-shadow:0 4px 16px rgba(0,0,0,0.3)';
+        toast.textContent = 'Link copied \u2014 paste in Safari to open';
+        document.body.appendChild(toast);
+        setTimeout(function() { if (toast.parentNode) toast.remove(); }, 3000);
+      });
+    } else {
+      // Fallback: prompt with the URL
+      prompt('Copy this link to open in Safari:', url);
+    }
+  } else {
+    // Normal browser: open in new tab
+    window.open(url, '_blank', 'noopener');
+  }
+}
+
 // ── Navigation ──
 function goHome(e) {
   if (e) e.preventDefault();
+  // Already on clean home page → scroll to top
+  if (mode === 'home' && !readerOpen && !currentSource && !homeScope) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
   closeReader();
   currentSource = null;
   readerSource = null;
   sourceAutoReader = false;
   activeCategories.clear();
   enterHome(true);
+  // Scroll to top after navigating home
+  setTimeout(function() { window.scrollTo({ top: 0 }); }, 0);
 }
 
 function goBack() {
@@ -1304,6 +1539,7 @@ function enterHome(push) {
   readerSource = null;
   sourceAutoReader = false;
   homeScope = null;
+  _currentSearchQuery = null;
   articleHistory = [];
   currentArticle = null;
   q.value = '';
@@ -1356,6 +1592,7 @@ async function enterSource(name, push) {
   mode = 'source';
   currentSource = name;
   readerSource = null;
+  _currentSearchQuery = null;
   sourceAutoReader = false;
   q.value = '';
   searchMeta.style.display = 'none';
@@ -1374,9 +1611,11 @@ function renderHome(filter) {
   if (!zimsCache || zimsCache.length === 0) {
     statsBar.innerHTML = ''; statsBar.style.display = 'none';
     pillsBar.innerHTML = ''; pillsBar.style.display = 'none';
-    output.innerHTML = '<div class="empty"><p>No knowledge sources found</p><p class="hint">Add ZIM files to get started</p>'
+    output.innerHTML = '<div id="discover-row"></div>'
+      + '<div class="empty"><p>No knowledge sources found</p><p class="hint">Add ZIM files to get started</p>'
       + (manageEnabled ? '<a href="/?manage" onclick="event.preventDefault();enterManage();setTimeout(function(){switchManageTab(\'browse\')},50)" style="display:inline-block;margin-top:16px;color:var(--amber);font-weight:500;font-size:14px;text-decoration:none;border-bottom:1px solid var(--amber-border)">Catalog \u2192</a>' : '')
       + '</div>';
+    _loadDiscover();
     return;
   }
 
@@ -1444,6 +1683,17 @@ function renderHome(filter) {
       'Search ' + scopeEntries.toLocaleString() + ' articles for &ldquo;' + esc(filter) + '&rdquo; \u2192</div>';
   }
 
+  // Discover (only on unscoped, unfiltered home)
+  var _showDiscover = !homeScope && !filter;
+  if (_showDiscover) {
+    h += '<div id="discover-row"></div>';
+  }
+
+  // Bookmarks (only on unscoped, unfiltered home)
+  if (!homeScope && !filter) {
+    h += renderBookmarksSection();
+  }
+
   // Favorites section at top (only on unscoped home)
   if (!homeScope) {
     const favNames = (collectionsCache && collectionsCache.favorites) || [];
@@ -1488,6 +1738,7 @@ function renderHome(filter) {
   }
 
   output.innerHTML = h;
+  if (_showDiscover) _loadDiscover();
 }
 
 function renderCardGrid(items, showStars, showCategory) {
@@ -1509,9 +1760,342 @@ function renderCardGrid(items, showStars, showCategory) {
         '<div class="name">' + esc(z.title || z.name) + '</div>' +
         (z.description ? '<div class="desc">' + esc(z.description) + '</div>' : '') +
         '<div class="detail">' + catPrefix + (typeof z.entries === 'number' ? z.entries.toLocaleString() + ' entries' : '') +
-        ' &middot; ' + fmtSize(z.size_gb) + '</div>' +
+        ' &middot; ' + fmtSize(z.size_gb) +
+        '</div>' +
       '</div></div>';
   }).join('') + '</div>';
+}
+
+// ── Discover: computed cards first, random fill to ~4 ──
+// Slot order: 1) Today (always), 2) APOD (if installed), 3) On This Day (if Wikipedia), 4+) 🎲 Random
+var _discoverLoading = false;
+
+function _moonPhase(date) {
+  // Synodic period: 29.53 days. Reference new moon: Jan 6 2000 18:14 UTC
+  var ref = new Date(Date.UTC(2000, 0, 6, 18, 14, 0));
+  var days = (date.getTime() - ref.getTime()) / 86400000;
+  var cycle = days % 29.53;
+  if (cycle < 0) cycle += 29.53;
+  var phase = cycle / 29.53; // 0=new, 0.5=full
+  var illum = Math.round((1 - Math.cos(phase * 2 * Math.PI)) / 2 * 100);
+  var names = ['New Moon','Waxing Crescent','First Quarter','Waxing Gibbous',
+               'Full Moon','Waning Gibbous','Last Quarter','Waning Crescent'];
+  var idx = Math.floor(phase * 8 + 0.5) % 8;
+  return { phase: phase, name: names[idx], illumination: illum };
+}
+
+function _renderTodayCard() {
+  var now = new Date();
+  var m = _moonPhase(now);
+  var dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+  var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var dateStr = days[now.getDay()] + ', ' + months[now.getMonth()] + ' ' + now.getDate();
+  var isLeapYear = (now.getFullYear() % 4 === 0 && (now.getFullYear() % 100 !== 0 || now.getFullYear() % 400 === 0));
+  var totalDays = isLeapYear ? 366 : 365;
+  var daysRemaining = totalDays - dayOfYear;
+  var subStr = 'Day ' + dayOfYear + ' \u00b7 ' + daysRemaining + ' remaining \u00b7 ' + m.name + ' ' + m.illumination + '%';
+  // Moon shadow offset: two same-size circles, shadow slides to reveal lit portion
+  // Waxing (0→0.5): shadow slides LEFT, revealing right side (northern hemisphere convention)
+  // Waning (0.5→1): shadow slides in from RIGHT, covering right side
+  var shadowX;
+  if (m.phase <= 0.5) {
+    shadowX = -(m.phase * 2) * 48; // 0→-48: new→full, shadow moves left
+  } else {
+    shadowX = ((1 - m.phase) * 2) * 48; // 48→0: full→new, shadow comes from right
+  }
+  // Stars
+  var stars = '';
+  for (var i = 0; i < 18; i++) {
+    var sx = Math.floor(Math.random() * 100);
+    var sy = Math.floor(Math.random() * 100);
+    var delay = (Math.random() * 3).toFixed(1);
+    var size = Math.random() > 0.7 ? 3 : 2;
+    stars += '<div class="dc-star" style="left:' + sx + '%;top:' + sy + '%;width:' + size + 'px;height:' + size + 'px;animation-delay:' + delay + 's"></div>';
+  }
+  // Moon glow intensity scales with illumination
+  var glowOpacity = (m.illumination / 100 * 0.2 + 0.05).toFixed(2);
+  return '<div class="dc-today">' + stars +
+    '<div class="dc-moon-glow" style="background:radial-gradient(circle, rgba(232,224,208,' + glowOpacity + ') 0%, transparent 70%)"></div>' +
+    '<div class="dc-moon-wrap"><div class="dc-moon"></div><div class="dc-moon-shadow" style="transform:translateX(' + shadowX.toFixed(1) + 'px)"></div></div>' +
+    '<div class="dc-today-text">' + dateStr + '<br>' + subStr + '</div></div>';
+}
+
+function _dismissDiscover() {
+  localStorage.setItem('zimi_hide_discover', '1');
+  var el = document.getElementById('discover-row');
+  if (el) el.innerHTML = '';
+  // Show undo toast in Docker mode (no settings overlay available)
+  if (!IS_DESKTOP) {
+    var toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;font-size:13px;color:var(--text2);z-index:300;box-shadow:0 4px 16px rgba(0,0,0,0.3)';
+    toast.innerHTML = 'Discover hidden. <a href="#" style="color:var(--amber);text-decoration:none" onclick="event.preventDefault();localStorage.removeItem(\'zimi_hide_discover\');this.parentNode.remove();renderHome()">Undo</a>';
+    document.body.appendChild(toast);
+    setTimeout(function() { if (toast.parentNode) toast.remove(); }, 5000);
+  }
+}
+
+function _loadDiscover() {
+  if (_discoverLoading) return;
+  if (localStorage.getItem('zimi_hide_discover') === '1') return;
+  var el = document.getElementById('discover-row');
+  if (!el) return;
+  var now = new Date();
+  var today = now.toISOString().substring(0, 10);
+  var cacheKey = 'zimi_disc6_' + today;
+  try {
+    var cached = JSON.parse(sessionStorage.getItem(cacheKey));
+    if (cached && cached.length > 1) {
+      // Ensure Today card is not first if content cards exist
+      if (cached[0] && cached[0].type === 'today' && cached.length > 1 && cached[1] && cached[1].type !== 'today') {
+        cached = [cached[1], cached[0]].concat(cached.slice(2));
+      }
+      _renderDiscover(el, cached);
+      return;
+    }
+  } catch(e) {}
+
+  // Today card is always first (computed, no server call)
+  var computed = [{ type: 'today' }];
+  var names = (zimsCache || []).map(function(z) { return z.name; });
+  var mmdd = ('0' + (now.getMonth() + 1)).slice(-2) + ('0' + now.getDate()).slice(-2);
+
+  // Named content slots from FEATURED_ZIMS — match installed ZIMs
+  var serverSlots = [];
+  var usedNames = {};
+  for (var fi = 0; fi < FEATURED_ZIMS.length; fi++) {
+    var feat = FEATURED_ZIMS[fi];
+    var zimName = null;
+    var zimEntries = -1;
+    for (var ni = 0; ni < names.length; ni++) {
+      var n = names[ni];
+      if (n === feat.match || n.indexOf(feat.match) === 0) {
+        // For wikipedia, prefer _en_all or exact match (skip _en_medicine etc.)
+        if (feat.match === 'wikipedia' && n !== 'wikipedia' && !/^wikipedia_en_all/i.test(n)) continue;
+        // Prefer ZIM with most entries (richest content)
+        var zInfo = zimsCache && zimsCache.find(function(z) { return z.name === n; });
+        var ec = (zInfo && typeof zInfo.entries === 'number') ? zInfo.entries : 0;
+        if (ec > zimEntries) { zimName = n; zimEntries = ec; }
+      }
+    }
+    if (!zimName) continue;
+    usedNames[zimName] = true;
+    var dated = feat.type === 'apod' || feat.type === 'onthisday' || feat.type === 'country';
+    serverSlots.push({name: zimName, dated: dated, type: feat.type, label: feat.label, icon: feat.icon});
+  }
+
+  // Random fill: pick visual ZIMs not already used as named slots
+  var TARGET = 6;
+  var randomNeeded = Math.max(0, TARGET - computed.length - serverSlots.length);
+  var skipCats = {'Stack Exchange':1, 'Dev Docs':1};
+  var skipPattern = /^zimgit/i;
+  var visualZims = (zimsCache || []).filter(function(z) {
+    return typeof z.entries === 'number' && z.entries > 100
+      && !skipPattern.test(z.name) && !skipCats[z.category] && !usedNames[z.name];
+  });
+  // Shuffle and pick
+  for (var ri = visualZims.length - 1; ri > 0; ri--) {
+    var rj = Math.floor(Math.random() * (ri + 1));
+    var tmp = visualZims[ri]; visualZims[ri] = visualZims[rj]; visualZims[rj] = tmp;
+  }
+  for (var k = 0; k < randomNeeded && k < visualZims.length; k++) {
+    serverSlots.push({name: visualZims[k].name, dated: false, type: 'random'});
+  }
+
+  if (serverSlots.length === 0) {
+    // No featured or random ZIMs matched — show teaser instead of lonely moon card
+    el.innerHTML = '<div class="discover-section"><div class="discover-label"><span>Discover</span><button class="dc-dismiss" onclick="event.stopPropagation();_dismissDiscover()" title="Hide Discover">\u00D7</button></div>' +
+      '<div class="dc-teaser">' +
+        '<p>Install more sources to unlock Discover \u2014 daily highlights from Wikipedia, NASA, Wikiquote, and more.</p>' +
+        (manageEnabled ? '<a href="#" onclick="event.preventDefault();enterManage();setTimeout(function(){switchManageTab(\'browse\')},50)">Browse Catalog \u2192</a>' : '') +
+      '</div></div>';
+    return;
+  }
+
+  // Show loading skeletons first, then Today card at position 2 (matching final layout)
+  var loadingCount = Math.min(serverSlots.length, 3);
+  var loadingItems = [];
+  loadingItems.push({ type: 'loading' });  // Position 1: skeleton (will become first content card)
+  for (var ci = 0; ci < computed.length; ci++) loadingItems.push(computed[ci]);  // Position 2: Today/moon
+  for (var li = 1; li < loadingCount; li++) loadingItems.push({ type: 'loading' });  // Remaining skeletons
+  _renderDiscover(el, loadingItems);
+  _discoverLoading = true;
+
+  Promise.all(serverSlots.map(function(s) {
+    var url = '/random?zim=' + encodeURIComponent(s.name) + '&thumb=1&require_thumb=1';
+    if (s.dated) url += '&date=' + mmdd;
+    url += '&seed=' + mmdd;
+    return fetch(url)
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(d) {
+        if (!d || d.error) return null;
+        return { zim: s.name, path: d.path, title: d.title || _titleFromPath(d.path || ''),
+                 thumbnail: d.thumbnail || null, blurb: d.blurb || null,
+                 attribution: d.attribution || null, speaker: d.speaker || null, author: d.author || null, part_of_speech: d.part_of_speech || null,
+                 date: d.date || null, type: s.type, label: s.label || null, icon: s.icon || null };
+      })
+      .catch(function() { return null; });
+  })).then(function(results) {
+    _discoverLoading = false;
+    // Named slots (have label) show even without thumbnails; random fill requires thumbnails
+    var items = results.filter(function(r) { return r && (r.thumbnail || r.label); });
+    // Move Today card to position 2 if there's content to show first
+    var all;
+    if (items.length > 0) {
+      all = [items[0]].concat(computed).concat(items.slice(1));
+    } else {
+      all = computed.concat(items);
+    }
+    if (items.length > 0) {
+      try { sessionStorage.setItem(cacheKey, JSON.stringify(all)); } catch(e) {}
+    }
+    var el2 = document.getElementById('discover-row');
+    if (el2) _renderDiscover(el2, all);
+  });
+}
+function _renderDiscover(el, items) {
+  var h = '<div class="discover-section"><div class="discover-label"><span>Discover</span><button class="dc-dismiss" onclick="event.stopPropagation();_dismissDiscover()" title="Hide Discover">\u00D7</button></div><div class="discover-scroll">';
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i];
+    // Loading skeleton placeholder
+    if (it.type === 'loading') {
+      h += '<div class="discover-card dc-no-click dc-loading">' +
+        '<div class="dc-thumb dc-skel"></div>' +
+        '<div class="dc-body">' +
+          '<div class="dc-skel-line" style="width:60%"></div>' +
+          '<div class="dc-skel-line" style="width:80%"></div>' +
+        '</div></div>';
+      continue;
+    }
+    // Today card — pure computed, no click
+    if (it.type === 'today') {
+      var _m = _moonPhase(new Date());
+      h += '<div class="discover-card dc-no-click">' +
+        _renderTodayCard() +
+        '<div class="dc-body">' +
+          '<div class="dc-source"><span>Today</span></div>' +
+          '<div class="dc-title">' + _m.name + '</div>' +
+          '<div class="dc-blurb">' + _m.illumination + '% illuminated</div>' +
+        '</div></div>';
+      continue;
+    }
+    // Date: only for APOD
+    var dateStr = null;
+    if (it.type === 'apod') {
+      dateStr = it.date || null;
+      if (!dateStr) {
+        var apMatch = (it.path || '').match(/ap(\d{2})(\d{2})(\d{2})/);
+        if (apMatch) {
+          var yr = parseInt(apMatch[1],10);
+          dateStr = (yr >= 90 ? '19' : '20') + apMatch[1] + '-' + apMatch[2] + '-' + apMatch[3];
+        }
+      }
+    }
+    var dateHtml = dateStr ? '<span class="dc-date">' + esc(_fmtDiscoverDate(dateStr)) + '</span>' : '';
+    // ZIM icon
+    var zimInfo = zimsCache && zimsCache.find(function(z) { return z.name === it.zim; });
+    var iconHtml = '';
+    if (zimInfo && zimInfo.has_icon) {
+      iconHtml = '<img class="dc-zim-icon" src="/w/' + encodeURIComponent(it.zim) + '/-/icon" loading="lazy">';
+    }
+    // Source label: named slots show ZIM icon + label, random shows dice
+    var sourceLabel, badgeHtml = '';
+    if (it.label) {
+      sourceLabel = it.label;
+      // Named slots: no emoji badge, ZIM icon is shown instead
+    } else if (it.type === 'random') {
+      sourceLabel = _zimTitle(it.zim);
+      badgeHtml = '<span class="dc-dice">\uD83C\uDFB2</span>';
+    } else {
+      sourceLabel = _zimTitle(it.zim);
+    }
+    // Thumbnail
+    var thumbHtml = it.thumbnail
+      ? '<img class="dc-thumb" src="' + escAttr(it.thumbnail) + '" loading="lazy" onerror="this.style.display=\'none\'" onload="if(this.naturalWidth<80||this.naturalHeight<60)this.style.display=\'none\'">'
+      : '<div class="dc-icon-thumb">' + iconHtml + '</div>';
+    // Show actual article title — never vague labels
+    var displayTitle = it.title || it.path;
+    // APOD: strip "APOD: YYYY Month DD – " date prefix from title (date shown as badge)
+    if (it.type === 'apod' && displayTitle) {
+      displayTitle = displayTitle.replace(/^APOD:\s*\d{4}\s+\w+\s+\d+\s*[\u2013\-]\s*/i, '');
+    }
+    if (it.type === 'onthisday' && displayTitle) {
+      // Clean portal prefixes but keep the real content
+      displayTitle = displayTitle.replace(/^Portal:Current events\/?/, '').replace(/_/g, ' ');
+      if (!displayTitle) displayTitle = it.title || 'Historical event';
+    }
+    var isQuote = it.blurb && (it.blurb.charAt(0) === '\u201c' || it.blurb.charAt(0) === '"');
+    var blurbHtml = it.blurb ? '<div class="dc-blurb' + (isQuote ? ' dc-quote' : '') + '">' + esc(it.blurb) + '</div>' : '';
+    // Quote cards: header + full-width quote + attribution at bottom
+    if (isQuote) {
+      var attrName = it.attribution || it.speaker || displayTitle;
+      // If the attributed person is mentioned IN the quote, it's "about" them, not "by" them
+      if (attrName && it.blurb && it.blurb.toLowerCase().indexOf(attrName.toLowerCase()) >= 0) {
+        attrName = '';  // suppress wrong attribution
+      }
+      var attrLine = attrName
+        ? '<div class="dc-attribution">\u2014 ' + esc(attrName) + '</div>'
+        : '';
+      h += '<div class="discover-card dc-quote-card" onclick="openArticle(\'' + escJs(it.zim) + '\',\'' + escJs(it.path) + '\',\'' + escJs(it.title || '') + '\')">' +
+        '<div class="dc-body">' +
+          '<div class="dc-header">' + iconHtml + '<span>' + esc(it.label || 'Quote of the Day') + '</span></div>' +
+          blurbHtml +
+          attrLine +
+        '</div></div>';
+    } else if (it.label === 'Word of the Day') {
+      // Word card: full-width like quote — title as headword, part of speech, definition as blurb
+      var posHtml = it.part_of_speech ? '<div class="dc-speaker" style="font-style:italic">' + esc(it.part_of_speech) + '</div>' : '';
+      h += '<div class="discover-card dc-quote-card" onclick="openArticle(\'' + escJs(it.zim) + '\',\'' + escJs(it.path) + '\',\'' + escJs(it.title || '') + '\')">' +
+        (it.thumbnail ? '<img class="dc-thumb" src="' + escAttr(it.thumbnail) + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') +
+        '<div class="dc-body">' +
+          '<div class="dc-header">' + iconHtml + '<span>' + esc(it.label) + '</span></div>' +
+          '<div class="dc-title" style="font-size:18px;margin:8px 0 2px">' + esc(displayTitle) + '</div>' +
+          posHtml +
+          (it.blurb ? '<div class="dc-blurb" style="-webkit-line-clamp:4">' + esc(it.blurb) + '</div>' : '') +
+        '</div></div>';
+    } else {
+      // Speaker line (for TED talks) or author line (for books)
+      var speakerHtml = '';
+      if (it.speaker && it.speaker !== displayTitle) {
+        speakerHtml = '<div class="dc-speaker">' + esc(it.speaker) + '</div>';
+      } else if (it.author) {
+        speakerHtml = '<div class="dc-speaker">' + esc(it.author) + '</div>';
+      }
+      // Skip blurb if it essentially duplicates the title
+      var showBlurb = blurbHtml;
+      if (it.blurb && displayTitle) {
+        var blurbNorm = it.blurb.replace(/[^\w\s]/g, '').toLowerCase().trim();
+        var titleNorm = displayTitle.replace(/[^\w\s]/g, '').toLowerCase().trim();
+        if (blurbNorm === titleNorm || titleNorm.indexOf(blurbNorm) >= 0 || blurbNorm.indexOf(titleNorm) >= 0) {
+          showBlurb = '';
+        }
+      }
+      h += '<div class="discover-card" onclick="openArticle(\'' + escJs(it.zim) + '\',\'' + escJs(it.path) + '\',\'' + escJs(it.title || '') + '\')">' +
+        thumbHtml +
+        '<div class="dc-body">' +
+          '<div class="dc-source">' + iconHtml + '<span>' + esc(sourceLabel) + '</span>' + badgeHtml + dateHtml + '</div>' +
+          '<div class="dc-title">' + esc(displayTitle) + '</div>' +
+          speakerHtml +
+          showBlurb +
+        '</div></div>';
+    }
+  }
+  h += '</div></div>';
+  el.innerHTML = h;
+  // Restore saved scroll position (e.g., after navigating back from an article)
+  try {
+    var savedScroll = sessionStorage.getItem('zimi_disc_scroll');
+    if (savedScroll) {
+      var scrollEl = el.querySelector('.discover-scroll');
+      if (scrollEl) scrollEl.scrollLeft = parseInt(savedScroll, 10);
+      sessionStorage.removeItem('zimi_disc_scroll');
+    }
+  } catch(e) {}
+}
+function _fmtDiscoverDate(dateStr) {
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var p = dateStr.split('-');
+  return months[parseInt(p[1], 10) - 1] + ' ' + parseInt(p[2], 10) + ', ' + p[0];
 }
 
 async function toggleFavorite(zimName) {
@@ -1702,6 +2286,7 @@ async function renderSource(name) {
     sourceHeaderEl.style.display = 'none';
     output.innerHTML = '';
     sourceAutoReader = true;
+    currentArticle = { zim: name, path: info.main_path };
     openReader('/w/' + encodeURIComponent(name) + '/' + info.main_path);
     return;
   }
@@ -1735,6 +2320,7 @@ async function renderSource(name) {
   // No catalog and no main_path — show empty source page
   if (info.main_path) {
     sourceAutoReader = true;
+    currentArticle = { zim: name, path: info.main_path };
     output.innerHTML = '';
     sourceHeaderEl.style.display = 'none';
     openReader('/w/' + encodeURIComponent(name) + '/' + info.main_path);
@@ -1746,13 +2332,22 @@ async function renderSource(name) {
 }
 
 // ── Search ──
+// ── History-in-dropdown: show recent history when search bar is focused ──
+q.addEventListener('focus', function() {
+  if (!q.value.trim() && mode !== 'manage') showHistoryDropdown();
+});
+
 q.addEventListener('input', () => {
   clearTimeout(searchTimer);
   const val = q.value.trim();
-  // Suggest (200ms debounce)
+  // Suggest (200ms debounce) — include history items when typing
   clearTimeout(suggestTimer);
-  if (val && val.length >= 2 && mode !== 'manage') {
-    suggestTimer = setTimeout(() => fetchSuggestions(val), 200);
+  if (val && val.length >= 1 && mode !== 'manage') {
+    // Show filtered history immediately, then fetch remote suggestions
+    showHistoryDropdown(val);
+    if (val.length >= 2) suggestTimer = setTimeout(() => fetchSuggestions(val), 200);
+  } else if (!val && mode !== 'manage') {
+    showHistoryDropdown();
   } else {
     hideSuggest();
   }
@@ -1825,6 +2420,7 @@ q.addEventListener('keydown', e => {
 async function doSearch(query, push) {
   if (push === undefined) push = true;
   if (!query) return;
+  _currentSearchQuery = query;
   clearTimeout(suggestTimer);
   hideSuggest();
 
@@ -1888,6 +2484,8 @@ async function doSearch(query, push) {
       }
     }
     renderSearchResults(allResults, scope);
+    // Persist search to browse history
+    _histPushSearch(query, scope, (d1.results || []).length);
 
     if (d1.partial) {
       // Show honest progress: "N title matches (Xs) — searching content..."
@@ -2033,10 +2631,11 @@ function renderSearchResults(data, scope) {
         '<span class="rs-name">' + esc(_zimTitle(r.zim)) + '</span></div>'
       : '';
     return '<div class="result" tabindex="0" role="button" data-zim="' + escAttr(r.zim) + '" data-path="' + escAttr(r.path) + '" style="animation-delay:' + (Math.min(i, 5) * 0.04) + 's" onclick="openArticle(\'' + escJs(r.zim) + '\', \'' + escJs(r.path) + '\', \'' + escJs(r.title || '') + '\')" onkeydown="if(event.key===\'Enter\')openArticle(\'' + escJs(r.zim) + '\', \'' + escJs(r.path) + '\', \'' + escJs(r.title || '') + '\')">' +
-      sourceRow +
+      '<div class="result-thumb" data-needs-thumb="1"></div>' +
+      '<div class="result-body">' + sourceRow +
       '<div class="title">' + esc(r.title) + '</div>' +
       (r.snippet ? '<div class="snippet">' + esc(r.snippet) + '</div>' : '<div class="snippet" data-needs-snippet="1"></div>') +
-      '</div>';
+      '</div></div>';
   }).join('') + '</div>';
 
   if (remaining > 0) {
@@ -2063,49 +2662,74 @@ function _zimTitle(name) {
   return (info && info.title) || name;
 }
 
-// ── Async Snippets ──
+// ── Async Snippets + Thumbnails ──
 async function loadSnippets() {
   if (snippetController) snippetController.abort();
   snippetController = new AbortController();
   const signal = snippetController.signal;
 
-  const els = document.querySelectorAll('.result [data-needs-snippet="1"]');
-  if (!els.length) return;
+  // Collect all result cards that need either snippets or thumbnails
+  const cards = document.querySelectorAll('.result[data-zim][data-path]');
+  const queue = [];
+  cards.forEach(function(card) {
+    const needsSnippet = card.querySelector('[data-needs-snippet="1"]');
+    const needsThumb = card.querySelector('[data-needs-thumb]');
+    if (needsSnippet || needsThumb) queue.push(card);
+  });
+  if (!queue.length) return;
 
-  const queue = Array.from(els);
   const concurrency = 4;
   let active = 0;
   let idx = 0;
 
   function next() {
     while (active < concurrency && idx < queue.length) {
-      const el = queue[idx++];
-      const card = el.closest('.result');
-      if (!card) continue;
+      const card = queue[idx++];
       const zim = card.dataset.zim;
       const path = card.dataset.path;
       if (!zim || !path) continue;
+      const snippetEl = card.querySelector('[data-needs-snippet="1"]');
       active++;
-      fetchSnippet(el, zim, path, signal).finally(() => { active--; next(); });
+      fetchSnippet(snippetEl || card.querySelector('.snippet'), zim, path, signal, card)
+        .finally(() => { active--; next(); });
     }
   }
   next();
 }
 
-async function fetchSnippet(el, zim, path, signal) {
+async function fetchSnippet(snippetEl, zim, path, signal, card) {
   try {
     const res = await fetch('/snippet?zim=' + encodeURIComponent(zim) + '&path=' + encodeURIComponent(path), { signal });
     const data = await res.json();
-    if (data.snippet) {
-      el.textContent = data.snippet;
-      el.removeAttribute('data-needs-snippet');
-      el.style.opacity = '0';
-      requestAnimationFrame(() => { el.style.opacity = '1'; });
-    } else {
-      el.remove();
+    // Populate snippet text if needed
+    if (snippetEl && snippetEl.hasAttribute('data-needs-snippet')) {
+      if (data.snippet) {
+        snippetEl.textContent = data.snippet;
+        snippetEl.removeAttribute('data-needs-snippet');
+        snippetEl.style.opacity = '0';
+        requestAnimationFrame(() => { snippetEl.style.opacity = '1'; });
+      } else {
+        snippetEl.remove();
+      }
+    }
+    // Populate thumbnail if returned
+    if (data.thumbnail && card) {
+      var thumbEl = card.querySelector('.result-thumb[data-needs-thumb]');
+      if (thumbEl) {
+        var img = new Image();
+        img.onload = function() {
+          if (img.naturalWidth >= 60 && img.naturalHeight >= 40) {
+            thumbEl.innerHTML = '';
+            thumbEl.appendChild(img);
+            thumbEl.classList.add('loaded');
+            thumbEl.removeAttribute('data-needs-thumb');
+          }
+        };
+        img.src = data.thumbnail;
+      }
     }
   } catch(e) {
-    if (e.name !== 'AbortError') el.remove();
+    if (e.name !== 'AbortError' && snippetEl && snippetEl.hasAttribute('data-needs-snippet')) snippetEl.remove();
   }
 }
 
@@ -2188,6 +2812,52 @@ document.addEventListener('mousedown', (e) => {
   }
 });
 
+function showHistoryDropdown(filter) {
+  var h = _histLoad();
+  if (!h.length) { if (!filter) return; }
+  var fl = filter ? filter.toLowerCase() : '';
+  var items = [];
+  var seen = new Set();
+  for (var i = 0; i < h.length && items.length < 8; i++) {
+    var entry = h[i];
+    var label, sub, key;
+    if (entry.type === 'search') {
+      label = entry.query;
+      sub = entry.zim ? _zimTitle(entry.zim) : 'All sources';
+      key = 's:' + label.toLowerCase();
+    } else {
+      label = entry.title || _titleFromPath(entry.path || '');
+      sub = entry.zim ? _zimTitle(entry.zim) : '';
+      key = 'a:' + (entry.zim || '') + ':' + (entry.path || '');
+    }
+    if (fl && !label.toLowerCase().includes(fl) && !sub.toLowerCase().includes(fl)) continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    items.push({ entry: entry, label: label, sub: sub, isSearch: entry.type === 'search', idx: i });
+  }
+  if (!items.length) {
+    if (!filter) hideSuggest();
+    return;
+  }
+  // Merge into suggestItems for keyboard navigation
+  suggestItems = items.map(function(it) {
+    return it.isSearch
+      ? { _hist: true, _histSearch: true, query: it.entry.query, zim: it.entry.zim || '', label: it.label, sub: it.sub }
+      : { _hist: true, zim: it.entry.zim, path: it.entry.path, title: it.label, label: it.label, sub: it.sub };
+  });
+  suggestIndex = -1;
+  var icon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;opacity:0.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+  var searchIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;opacity:0.5"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="m21 21-4.3-4.3"/></svg>';
+  suggestDropdown.innerHTML = (filter ? '' : '<div style="padding:6px 14px 2px;font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Recent</div>') +
+    items.map(function(it, i) {
+      return '<div class="suggest-item" data-i="' + i + '" onmousedown="selectSuggest(' + i + ')" style="display:flex;align-items:center;gap:8px">' +
+        (it.isSearch ? searchIcon : icon) +
+        '<div style="flex:1;min-width:0"><div class="sg-title">' + esc(it.label) + '</div>' +
+        '<div class="sg-source">' + esc(it.sub) + '</div></div></div>';
+    }).join('');
+  suggestDropdown.style.display = 'block';
+}
+
 function showSuggest() {
   suggestIndex = -1;
   suggestDropdown.innerHTML = suggestItems.map((s, i) =>
@@ -2215,6 +2885,14 @@ function selectSuggest(i) {
   const s = suggestItems[i];
   if (!s) return;
   hideSuggest();
+  // History search item: re-execute the search
+  if (s._histSearch) {
+    q.value = s.query;
+    if (s.zim) { enterSource(s.zim); }
+    doSearch(s.query);
+    return;
+  }
+  // Regular suggestion or history article
   q.value = s.title;
   openArticle(s.zim, s.path, s.title);
 }
@@ -2404,6 +3082,109 @@ async function loadFullCatalog() {
   return _catalogCache;
 }
 
+const FEATURED_ZIMS = [
+  { match: 'wikipedia',     type: 'onthisday', label: 'On This Day',        icon: '\uD83C\uDF0D', promo: 'Wikipedia',           unlock: 'Discover: On This Day' },
+  { match: 'apod.nasa', type: 'apod', label: 'Picture of the Day', icon: '\uD83D\uDD2D', promo: 'NASA APOD', unlock: 'Discover: Picture of the Day' },
+  { match: 'wiktionary',    type: 'random',    label: 'Word of the Day',    icon: '\uD83D\uDCD6', promo: 'Wiktionary',          unlock: 'Discover: Word of the Day' },
+  { match: 'wikivoyage',    type: 'random',    label: 'Destination of the Day', icon: '\u2708\uFE0F', promo: 'Wikivoyage',      unlock: 'Discover: Destination of the Day' },
+  { match: 'gutenberg',     type: 'random',    label: 'Book of the Day',    icon: '\uD83D\uDCDA', promo: 'Project Gutenberg',   unlock: 'Discover: Book of the Day' },
+  { match: 'wikiquote',     type: 'random',    label: 'Quote of the Day',   icon: '\uD83D\uDCAC', promo: 'Wikiquote',           unlock: 'Discover: Quote of the Day' },
+  { match: 'ted',           type: 'random',    label: 'Talk of the Day',    icon: '\uD83C\uDFAC', promo: 'TED Talks',           unlock: 'Discover: Talk of the Day' },
+  { match: 'xkcd',          type: 'random',    label: 'Comic of the Day',   icon: '\uD83C\uDFA8', promo: 'xkcd',                unlock: 'Discover: Comic of the Day' },
+  { match: 'theworldfactbook', type: 'country', label: 'Country of the Day', icon: '\uD83D\uDDFA\uFE0F', promo: 'CIA World Factbook', unlock: 'Discover: Country of the Day' },
+];
+
+function _isFeaturedInstalled(feat, grouped) {
+  // Check ALL matching catalog groups — if any variant in any group is installed, this featured ZIM is installed
+  // Also check zimsCache directly: installed ZIM names often don't match catalog names exactly
+  if (zimsCache) {
+    for (var z of zimsCache) {
+      if (z.name === feat.match || z.name.startsWith(feat.match + '_') || (z.name.indexOf(feat.match) >= 0 && z.name.indexOf('_') >= 0)) {
+        return true;
+      }
+    }
+  }
+  return grouped.some(g => (g.name === feat.match || g.name.startsWith(feat.match + '_')) && (g.variants || [g]).some(v => v.installed));
+}
+
+function buildFeaturedCarousel(items) {
+  const grouped = groupVariants(items);
+  let cards = '';
+  for (const feat of FEATURED_ZIMS) {
+    if (_isFeaturedInstalled(feat, grouped)) continue; // Skip installed — they show on homepage Discover
+    const group = grouped.find(g => g.name === feat.match || g.name.startsWith(feat.match + '_'));
+    if (!group) continue;
+    const variants = group.variants || [group];
+    const withLabels = variants.filter(v => v.download_url).map(v => ({
+      label: variantLabel(v.download_url) || 'Full',
+      size: formatSize(v.size_bytes),
+      url: v.download_url
+    })).filter(v => v.label !== 'No images');  // Don't offer "No images" in featured
+    const order = { 'Mini': 0, 'Full': 1 };
+    withLabels.sort((a, b) => (order[a.label] ?? 1) - (order[b.label] ?? 1));
+    if (withLabels.length === 0) continue;
+    // Compact banner: icon + label + download action
+    var actionsHtml;
+    if (withLabels.length > 1) {
+      var fcSelId = 'fc-sel-' + Math.random().toString(36).substr(2, 6);
+      var opts = withLabels.map(v =>
+        '<option value="' + escAttr(v.url) + '">' + esc(v.label + ' (' + v.size + ')') + '</option>'
+      ).join('');
+      actionsHtml = '<select id="' + fcSelId + '" class="fc-flavor-select">' + opts + '</select>' +
+        '<button class="ci-add-btn" onclick="event.stopPropagation();downloadZim(document.getElementById(\'' + fcSelId + '\').value, this)">Get</button>';
+    } else {
+      actionsHtml = '<button class="ci-add-btn" onclick="event.stopPropagation();downloadZim(\'' + escAttr(withLabels[0].url) + '\', this)">' +
+        esc('Get ' + withLabels[0].size) + '</button>';
+    }
+    // "Unlocks" hint: what Discover feature this ZIM enables
+    var unlockHtml = feat.unlock ? '<div class="fc-promo-unlock">' + esc(feat.unlock) + '</div>' : '';
+    cards += '<div class="featured-card">' +
+      '<div class="fc-promo">' +
+        '<div class="fc-promo-icon">' + feat.icon + '</div>' +
+        '<div style="display:flex;flex-direction:column;gap:1px">' +
+          '<div class="fc-promo-label">' + esc(feat.promo) + '</div>' +
+          unlockHtml +
+        '</div>' +
+      '</div>' +
+      '<div class="fc-actions">' + actionsHtml + '</div>' +
+    '</div>';
+  }
+  if (!cards) return '';
+  // Discover Essentials pack: collect smallest variant of each uninstalled featured ZIM
+  var packUrls = [];
+  var packSize = 0;
+  for (const feat of FEATURED_ZIMS) {
+    if (_isFeaturedInstalled(feat, grouped)) continue;
+    const group = grouped.find(g => g.name === feat.match || g.name.startsWith(feat.match + '_'));
+    if (!group) continue;
+    const variants = group.variants || [group];
+    const downloadable = variants.filter(v => v.download_url && variantLabel(v.download_url) !== 'No images');
+    if (downloadable.length === 0) continue;
+    downloadable.sort((a, b) => (a.size_bytes || 0) - (b.size_bytes || 0));
+    packUrls.push(downloadable[0].download_url);
+    packSize += downloadable[0].size_bytes || 0;
+  }
+  var packHtml = '';
+  if (packUrls.length >= 3) {
+    var packSizeFmt = formatSize(packSize);
+    packHtml = '<div class="fc-pack">' +
+      '<span class="fc-pack-label">\u2728 Discover Essentials \u2014 ' + packUrls.length + ' sources (' + packSizeFmt + ')</span>' +
+      '<button class="ci-add-btn fc-pack-btn" data-pack="' + escAttr(JSON.stringify(packUrls)) + '" onclick="event.stopPropagation();_downloadPack(this,JSON.parse(this.dataset.pack))">Get All</button>' +
+    '</div>';
+  }
+  return '<div class="featured-section">' + packHtml + '<div class="featured-scroll">' + cards + '</div></div>';
+}
+
+function _restoreCatalogLang() {
+  // Move language select back to manage-search bar if it was moved to footer
+  var sel = document.getElementById('catalog-lang');
+  if (!sel) return;
+  var bar = document.querySelector('#manage-browse .manage-search');
+  if (bar && !bar.contains(sel)) { bar.appendChild(sel); bar.style.display = ''; }
+  // Re-show the manage-search bar
+  if (bar) bar.style.display = '';
+}
+
 function renderBrowseGallery() {
   const results = document.getElementById('catalog-results');
   if (!results) return;
@@ -2411,6 +3192,10 @@ function renderBrowseGallery() {
   manageCategoryFilter = null;
   pillsBar.innerHTML = ''; pillsBar.style.display = 'none';
   q.placeholder = 'Search catalog...';
+
+  // Detach language select before destroying DOM (it may have been moved into footer)
+  var _langSel = document.getElementById('catalog-lang');
+  if (_langSel && _langSel.parentNode) _langSel.parentNode.removeChild(_langSel);
 
   results.innerHTML = '<div class="loading"><span class="spinner-inline"></span>Loading library...</div>';
 
@@ -2455,8 +3240,7 @@ function renderBrowseGallery() {
     }
 
     let h = '<div class="browse-gallery">';
-    h += '<div class="browse-subtitle" style="text-align:center;margin:12px 0 8px">' + items.length.toLocaleString() + ' ZIMs available across ' +
-      BROWSE_CATEGORIES.length + ' categories</div>';
+    h += buildFeaturedCarousel(items);
     h += '<div class="browse-grid">';
 
     for (const cat of BROWSE_CATEGORIES) {
@@ -2474,14 +3258,30 @@ function renderBrowseGallery() {
         '<div class="bcc-arrow">\u203A</div>' +
       '</div>';
     }
-    h += '</div></div>';
+    h += '</div>';
+    // Footer: count centered, language dropdown moved below
+    var activeCats = BROWSE_CATEGORIES.filter(function(c) { return (catCounts[c.key] || 0) > 0; }).length;
+    h += '<div class="browse-footer">' +
+      '<div class="browse-footer-count">' + items.length.toLocaleString() + ' ZIMs available \u00B7 ' + activeCats + ' categories</div>' +
+      '<div class="browse-footer-lang"></div>' +
+    '</div>';
+    h += '</div>';
     results.innerHTML = h;
+    // Re-append the detached language select into the footer
+    var langTarget = results.querySelector('.browse-footer-lang');
+    if (_langSel && langTarget) {
+      langTarget.appendChild(_langSel);
+      // Hide the now-empty manage-search bar
+      var searchBar = document.querySelector('#manage-browse .manage-search');
+      if (searchBar) searchBar.style.display = 'none';
+    }
   }).catch(err => {
     results.innerHTML = '<div class="empty"><p>Failed to load library</p><div class="hint">' + esc(String(err)) + '</div></div>';
   });
 }
 
 function drillCategory(catKey) {
+  _restoreCatalogLang();
   const results = document.getElementById('catalog-results');
   if (!results) return;
   _browseView = 'drilldown';
@@ -2523,6 +3323,7 @@ function drillCategory(catKey) {
 
 function browseCatalogFilter(query) {
   if (!query) { renderBrowseGallery(); return; }
+  _restoreCatalogLang();
   const results = document.getElementById('catalog-results');
   if (!results) return;
   _browseView = 'search';
@@ -2581,8 +3382,9 @@ function categorizeZim(name) {
 
 function formatSize(bytes) {
   if (!bytes) return '0 MB';
-  const gb = bytes / (1024 ** 3);
-  return gb >= 1 ? gb.toFixed(1) + ' GB' : (bytes / (1024 ** 2)).toFixed(0) + ' MB';
+  const mb = bytes / (1024 ** 2);
+  if (mb >= 900) return (bytes / (1024 ** 3)).toFixed(1) + ' GB';
+  return Math.round(mb) + ' MB';
 }
 
 function groupVariants(items) {
@@ -2648,14 +3450,23 @@ function renderCatalogItem(group) {
     });
     const order = { 'Mini': 0, 'No images': 1, 'Full': 2 };
     withLabels.sort((a, b) => (order[a.label] ?? 1) - (order[b.label] ?? 1));
-    const btns = withLabels.map(v =>
-      '<button class="ci-variant-btn" onclick="downloadZim(\'' + escAttr(v.url) + '\', this)">' + esc(v.label + ' (' + v.size + ')') + '</button>'
-    );
-    if (btns.length) actionsHtml = '<div class="ci-variants">' + btns.join('') + '</div>';
+    if (withLabels.length > 1) {
+      // Dropdown + single download button
+      const selId = 'ci-flavor-' + Math.random().toString(36).substr(2, 6);
+      const opts = withLabels.map(v =>
+        '<option value="' + escAttr(v.url) + '">' + esc(v.label + ' (' + v.size + ')') + '</option>'
+      ).join('');
+      actionsHtml = '<div class="ci-variants ci-flavor-row">' +
+        '<select id="' + selId + '" class="ci-flavor-select" onclick="event.stopPropagation()">' + opts + '</select>' +
+        '<button class="ci-add-btn" onclick="event.stopPropagation();downloadZim(document.getElementById(\'' + selId + '\').value, this)">Download</button>' +
+      '</div>';
+    } else if (withLabels.length === 1) {
+      actionsHtml = '<button class="ci-add-btn" onclick="event.stopPropagation();downloadZim(\'' + escAttr(withLabels[0].url) + '\', this)">' + esc('Download ' + withLabels[0].label + ' (' + withLabels[0].size + ')') + '</button>';
+    }
   }
   const catAttr = item.category ? ' data-category="' + escAttr(item.category) + '"' : '';
   const instName = anyInstalled ? (variants.find(v => v.installed && v._installedName) || {})._installedName || '' : '';
-  const openAttr = instName ? ' style="cursor:pointer" onclick="if(!event.target.closest(\'button\')){enterSource(\'' + escJs(instName) + '\',true)}"' : '';
+  const openAttr = instName ? ' style="cursor:pointer" onclick="if(!event.target.closest(\'button\')&&!event.target.closest(\'.flavor-pill\')){enterSource(\'' + escJs(instName) + '\',true)}"' : '';
   return '<div class="catalog-item' + (anyInstalled ? ' ci-installed-item' : '') + '"' + catAttr + openAttr + '>' +
     '<div class="ci-icon">' + iconHtml + '</div>' +
     '<div class="ci-info">' +
@@ -2939,10 +3750,12 @@ async function renderActivityTab() {
       if (m.rate_limited) h += '<div class="mc-row"><span class="mc-label">Rate limited</span><span class="mc-value" style="color:var(--amber)">' + m.rate_limited + '</span></div>';
       if (d.zim_size_gb) h += '<div class="mc-row"><span class="mc-label">ZIM disk usage</span><span class="mc-value">' + d.zim_size_gb + ' GB</span></div>';
       if (d.disk_free_gb) h += '<div class="mc-row"><span class="mc-label">Disk free</span><span class="mc-value">' + d.disk_free_gb + ' GB</span></div>';
+      if (sdata.linked_zims) h += '<div class="mc-row"><span class="mc-label">Cross-linked</span><span class="mc-value">' + sdata.linked_zims + ' of ' + sdata.zim_count + ' sources <span style="color:var(--text2);font-size:11px">(' + sdata.domain_count + ' domains)</span></span></div>';
       h += '</div>';
 
       // Save title_index data for rendering after usage
       var _ti = sdata.title_index;
+      var _xzimRefs = sdata.cross_zim_refs;
     }
 
     // Usage stats section (above title index — more relevant to user)
@@ -3027,6 +3840,23 @@ async function renderActivityTab() {
         h += '</div>';
       }
       h += '</div>';
+    }
+
+    // Cross-ZIM references
+    var xrefs = (typeof _xzimRefs !== 'undefined') ? _xzimRefs : null;
+    if (xrefs && xrefs.length > 0) {
+      h += '<div class="manage-card"><h2>Cross-ZIM Navigation</h2>';
+      h += '<div style="display:flex;flex-direction:column;gap:4px">';
+      for (var xi = 0; xi < xrefs.length && xi < 20; xi++) {
+        var xr = xrefs[xi];
+        h += '<div style="display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 8px;background:var(--surface);border-radius:6px">';
+        h += '<span style="color:var(--text)">' + esc(xr.from) + '</span>';
+        h += '<span style="color:var(--text2)">\u2192</span>';
+        h += '<span style="color:var(--text)">' + esc(xr.to) + '</span>';
+        h += '<span style="margin-left:auto;color:var(--text2);font-size:11px">' + xr.count + ' link' + (xr.count !== 1 ? 's' : '') + '</span>';
+        h += '</div>';
+      }
+      h += '</div></div>';
     }
 
     if (!h) {
@@ -3269,7 +4099,7 @@ function renderInstalled(filterText) {
       if (variants.length > 1) {
         const vid = '_fv_' + z.name;
         window[vid] = variants;
-        meta.push('<span class="flavor-pill" onclick="showFlavorPicker(this, \'' + escAttr(z.name) + '\', window[\'' + vid + '\'])">' +
+        meta.push('<span class="flavor-pill" onclick="event.stopPropagation();showFlavorPicker(this, \'' + escAttr(z.name) + '\', window[\'' + vid + '\'])">' +
           esc(flavor || 'Full') +
           '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>' +
         '</span>');
@@ -3286,7 +4116,7 @@ function renderInstalled(filterText) {
         actionsHtml = '<span class="ci-installed-badge">Installed</span>' +
           '<button class="ci-delete-btn" onclick="deleteZim(\'' + escAttr(z.file) + '\', this)" title="Delete">\u00D7</button>';
       }
-      items_h += '<div class="catalog-item' + (upd ? ' ci-has-update' : '') + '" style="cursor:pointer" onclick="if(!event.target.closest(\'button\')){enterSource(\'' + escJs(z.name) + '\',true)}">' +
+      items_h += '<div class="catalog-item' + (upd ? ' ci-has-update' : '') + '" style="cursor:pointer" onclick="if(!event.target.closest(\'button\')&&!event.target.closest(\'.flavor-pill\')){enterSource(\'' + escJs(z.name) + '\',true)}">' +
         '<div class="ci-icon">' + iconHtml + '</div>' +
         '<div class="ci-info">' +
           '<div class="ci-title">' + esc(z.title || z.name) + '</div>' +
@@ -3437,6 +4267,23 @@ async function searchCatalog(append) {
   } catch(e) {
     if (!append) results.innerHTML = '<div class="empty"><p>Failed to fetch catalog</p></div>';
   }
+}
+
+async function _downloadPack(btn, urls) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Starting...'; }
+  var started = 0;
+  for (var i = 0; i < urls.length; i++) {
+    try {
+      const res = await manageFetch('/manage/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: urls[i] }),
+      });
+      const data = await res.json();
+      if (!data.error) started++;
+    } catch(e) {}
+  }
+  if (btn) { btn.textContent = started + ' queued'; btn.classList.add('ci-installed-badge'); }
 }
 
 async function downloadZim(url, btn, isUpdate) {
@@ -3929,6 +4776,8 @@ function openReader(url) {
 
   mainView.classList.add('hidden');
   reader.classList.add('open');
+  // Hide main document scroll so iframe becomes primary scroller (iOS tap-to-top)
+  document.documentElement.style.overflowY = 'hidden';
   loading.classList.remove('hidden');
 
   // Punch-out button: for pdf.js viewer URLs, link to the raw PDF for download
@@ -3949,6 +4798,8 @@ function openReader(url) {
         var a = e.target.closest('a[href]');
         if (!a) return;
         var href = a.getAttribute('href') || '';
+        // Hash-only links (#/route, #heading): let iframe handle natively (SPA routing, anchors)
+        if (href.startsWith('#')) return;
         var lhref = href.toLowerCase();
         // Resolve URL against iframe's location (not document.baseURI which may point to original domain)
         var frameLoc = frame.contentWindow.location;
@@ -3966,17 +4817,85 @@ function openReader(url) {
         if (wMatch) {
           e.preventDefault();
           var linkZim = decodeURIComponent(wMatch[1]);
-          var linkPath = decodeURIComponent(wMatch[2]).replace(/[?#].*$/, ''); // strip query and fragment
+          var linkPath = decodeURIComponent(wMatch[2]).replace(/\?.*$/, ''); // strip query params, keep hash
           openArticle(linkZim, linkPath);
           return;
         }
-        // External links: open in new tab
-        if (/^https?:\/\//.test(href) && !fullUrl.startsWith(location.origin)) {
+        // External links: try cross-ZIM resolution, fall back to new tab
+        // Check both raw href (https://...) and protocol-relative (//domain/...)
+        if ((/^https?:\/\//.test(href) || /^\/\//.test(href)) && !fullUrl.startsWith(location.origin)) {
           e.preventDefault();
-          window.open(fullUrl, '_blank');
+          // Quick client-side check: skip /resolve if domain isn't in any installed ZIM
+          try {
+            var linkHost = new URL(fullUrl).hostname;
+            var linkBare = linkHost.replace(/^www\./, '');
+            if (!_domainZimMap[linkHost] && !_domainZimMap[linkBare]) {
+              window.open(fullUrl, '_blank');
+              return;
+            }
+          } catch(ex) {}
+          var fromZim = readerSource || (currentArticle && currentArticle.zim) || '';
+          fetch('/resolve?url=' + encodeURIComponent(fullUrl) + (fromZim ? '&from=' + encodeURIComponent(fromZim) : ''))
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              if (data.found) openArticle(data.zim, data.path);
+              else window.open(fullUrl, '_blank');
+            })
+            .catch(function() { window.open(fullUrl, '_blank'); });
         }
       });
     } catch(e) { /* cross-origin — ZIM content loaded from a different origin */ }
+    // Classify links: batch-resolve external URLs to find which ones are available locally
+    // Only highlight links that actually resolve to a different installed ZIM
+    var _currentZim = readerSource || (currentArticle && currentArticle.zim) || '';
+    if (Object.keys(_domainZimMap).length > 0 && !_frameLoc.startsWith('/static/')) try {
+      var styleEl = frame.contentDocument.createElement('style');
+      styleEl.textContent = '.zimi-xzim{text-decoration-style:dotted;text-decoration-color:var(--amber,#f59e0b)}.zimi-ext{opacity:0.55}';
+      frame.contentDocument.head.appendChild(styleEl);
+      // Collect external URLs that might resolve to installed ZIMs
+      var urlMap = {}; // url → [anchor elements]
+      var links = frame.contentDocument.querySelectorAll('a[href]');
+      var frameLoc2 = frame.contentWindow.location;
+      links.forEach(function(a) {
+        var h2 = a.getAttribute('href') || '';
+        var full2;
+        try { full2 = new URL(h2, frameLoc2.href).href; } catch(ex) { return; }
+        if (full2.startsWith(location.origin)) return;
+        if (!/^https?:\/\//.test(full2)) return;
+        try {
+          var host2 = new URL(full2).hostname;
+          var bare2 = host2.replace(/^www\./, '');
+          if (_domainZimMap[host2] || _domainZimMap[bare2]) {
+            // This domain has a matching ZIM — collect for batch resolve
+            if (!urlMap[full2]) urlMap[full2] = [];
+            urlMap[full2].push(a);
+          } else {
+            a.classList.add('zimi-ext');
+          }
+        } catch(ex) {}
+      });
+      // Batch resolve collected URLs (max 50)
+      var extUrls = Object.keys(urlMap).slice(0, 50);
+      if (extUrls.length > 0) {
+        fetch('/resolve', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({urls: extUrls})
+        }).then(function(r) { return r.json(); }).then(function(data) {
+          var results = data.results || {};
+          for (var u in results) {
+            var anchors = urlMap[u];
+            if (!anchors) continue;
+            if (results[u].found && results[u].zim !== _currentZim) {
+              anchors.forEach(function(a) { a.classList.add('zimi-xzim'); });
+            } else if (!results[u].found) {
+              anchors.forEach(function(a) { a.classList.add('zimi-ext'); });
+            }
+            // Same-ZIM links → leave unstyled
+          }
+        }).catch(function() {});
+      }
+    } catch(e) { /* cross-origin */ }
     // Update document/window title from iframe content (skip for pdf.js — it reports
     // "PDF.js viewer" which overwrites the good title already set by openArticle)
     if (!_frameLoc.startsWith('/static/')) try {
@@ -3992,11 +4911,156 @@ function openReader(url) {
         _setWindowTitle(t);
       }
     } catch(e) { /* cross-origin or closed */ }
+    // Track current article for bookmark button (iframe may have navigated via relative link)
+    try {
+      var _fPath = frame.contentWindow.location.pathname;
+      var _wm = _fPath.match(/^\/w\/([^\/]+)\/(.+)/);
+      if (_wm) {
+        var _navZim = decodeURIComponent(_wm[1]);
+        var _navPath = decodeURIComponent(_wm[2]);
+        currentArticle = { zim: _navZim, path: _navPath };
+        _updateBookmarkBtn();
+      }
+    } catch(e) {}
   };
   // Use location.replace to avoid polluting parent history stack
   // (setting iframe.src adds a session history entry that breaks the back button)
   try { frame.contentWindow.location.replace(url); } catch(e) { frame.src = url; }
   updateTopbar();
+}
+
+// ── Persistent History (localStorage) ──
+var _persistHist = null; // lazy-loaded
+var _currentSearchQuery = null; // tracks which search led to article clicks
+var _HIST_KEY = 'zimi_history';
+var _HIST_MAX = 200;
+
+function _histLoad() {
+  if (_persistHist !== null) return _persistHist;
+  try { _persistHist = JSON.parse(localStorage.getItem(_HIST_KEY)) || []; }
+  catch(e) { _persistHist = []; }
+  return _persistHist;
+}
+function _histSave() {
+  if (!_persistHist) return;
+  try { localStorage.setItem(_HIST_KEY, JSON.stringify(_persistHist)); } catch(e) {}
+}
+function _histPushArticle(zim, path, title) {
+  var h = _histLoad();
+  // Deduplicate: remove if same zim+path exists recently (within last 5 entries)
+  for (var i = 0; i < Math.min(5, h.length); i++) {
+    if (h[i].type === 'article' && h[i].zim === zim && h[i].path === path) {
+      h.splice(i, 1);
+      break;
+    }
+  }
+  var entry = { type: 'article', zim: zim, path: path, title: title || _titleFromPath(path), timestamp: Date.now() };
+  if (_currentSearchQuery) entry.fromQuery = _currentSearchQuery;
+  h.unshift(entry);
+  if (h.length > _HIST_MAX) h.length = _HIST_MAX;
+  _histSave();
+}
+function _histPushSearch(query, zimName, resultCount) {
+  var h = _histLoad();
+  // Deduplicate recent identical searches
+  if (h.length > 0 && h[0].type === 'search' && h[0].query === query && h[0].zim === (zimName || '')) return;
+  h.unshift({ type: 'search', zim: zimName || '', query: query, resultCount: resultCount || 0, timestamp: Date.now() });
+  if (h.length > _HIST_MAX) h.length = _HIST_MAX;
+  _histSave();
+}
+function _histClear() {
+  _persistHist = [];
+  try { localStorage.removeItem(_HIST_KEY); } catch(e) {}
+  renderHistoryPanel();
+}
+function _histRemove(idx) {
+  var h = _histLoad();
+  if (idx >= 0 && idx < h.length) {
+    h.splice(idx, 1);
+    _histSave();
+  }
+  renderHistoryPanel();
+}
+function _histDateGroup(ts) {
+  var now = new Date();
+  var d = new Date(ts);
+  var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  var yesterday = new Date(today - 86400000);
+  var weekAgo = new Date(today - 6 * 86400000);
+  if (d >= today) return 'Today';
+  if (d >= yesterday) return 'Yesterday';
+  if (d >= weekAgo) return 'This Week';
+  return 'Older';
+}
+function toggleHistoryPanel() {
+  var panel = document.getElementById('history-panel');
+  if (panel.classList.contains('open')) {
+    panel.classList.remove('open');
+  } else {
+    renderHistoryPanel();
+    panel.classList.add('open');
+  }
+}
+function renderHistoryPanel() {
+  var panel = document.getElementById('history-panel');
+  var h = _histLoad();
+  if (h.length === 0) {
+    panel.innerHTML = '<div class="history-panel-header"><h3>History</h3><button class="hp-clear" onclick="toggleHistoryPanel()">\u2715</button></div>' +
+      '<div class="hp-empty">No history yet. Browse articles and search to build your history.</div>';
+    return;
+  }
+  var html = '<div class="history-panel-header"><h3>History</h3><div style="display:flex;gap:8px"><button class="hp-clear" onclick="_histClear()">Clear</button><button class="hp-clear" onclick="toggleHistoryPanel()">\u2715</button></div></div>';
+  var currentGroup = '';
+  // Build hierarchical structure: group articles under their parent search
+  // Walk entries and collect runs of articles that share a fromQuery with the preceding search
+  var i = 0;
+  while (i < h.length) {
+    var item = h[i];
+    var group = _histDateGroup(item.timestamp);
+    if (group !== currentGroup) {
+      if (currentGroup) html += '</div>';
+      html += '<div class="hp-group"><div class="hp-group-label">' + esc(group) + '</div>';
+      currentGroup = group;
+    }
+    if (item.type === 'search') {
+      // Render search header
+      var searchSub = item.zim ? _zimTitle(item.zim) : 'All sources';
+      if (item.resultCount) searchSub += ' \u00B7 ' + item.resultCount + ' results';
+      html += '<div class="hp-item" onclick="toggleHistoryPanel();' + (item.zim ? 'enterSource(\'' + escJs(item.zim) + '\',false);' : '') + 'q.value=\'' + escJs(item.query) + '\';doSearch(\'' + escJs(item.query) + '\')">' +
+        '<div class="hp-icon">\uD83D\uDD0D</div>' +
+        '<div class="hp-detail"><div class="hp-title">' + esc(item.query) + '</div>' +
+        '<div class="hp-sub">' + esc(searchSub) + '</div></div>' +
+        '<button class="hp-item-del" onclick="event.stopPropagation();_histRemove(' + i + ')">\u2715</button></div>';
+      // Collect child articles that came from this search
+      var j = i + 1;
+      while (j < h.length && h[j].type === 'article' && h[j].fromQuery === item.query) {
+        var child = h[j];
+        var cIcon = child.zim ? _sourceIconHtml(child.zim, 16) : '';
+        var cSub = child.zim ? _zimTitle(child.zim) : '';
+        html += '<div class="hp-item" style="padding-left:38px" onclick="toggleHistoryPanel();openArticle(\'' + escJs(child.zim) + '\',\'' + escJs(child.path) + '\',\'' + escJs(child.title || '') + '\')">' +
+          '<div class="hp-icon" style="width:22px;height:22px">' + cIcon + '</div>' +
+          '<div class="hp-detail"><div class="hp-title">' + esc(child.title || child.path) + '</div>' +
+          '<div class="hp-sub">' + esc(cSub) + '</div></div>' +
+          '<button class="hp-item-del" onclick="event.stopPropagation();_histRemove(' + j + ')">\u2715</button></div>';
+        j++;
+      }
+      i = j;
+    } else if (item.type === 'article') {
+      // Standalone article (no parent search, or fromQuery doesn't match previous search)
+      var aIcon = item.zim ? _sourceIconHtml(item.zim, 20) : '\uD83D\uDCC4';
+      var aSub = item.zim ? _zimTitle(item.zim) : '';
+      html += '<div class="hp-item" onclick="toggleHistoryPanel();openArticle(\'' + escJs(item.zim) + '\',\'' + escJs(item.path) + '\',\'' + escJs(item.title || '') + '\')">' +
+        '<div class="hp-icon">' + aIcon + '</div>' +
+        '<div class="hp-detail"><div class="hp-title">' + esc(item.title || item.path) + '</div>' +
+        '<div class="hp-sub">' + esc(aSub) + '</div></div>' +
+        '<button class="hp-item-del" onclick="event.stopPropagation();_histRemove(' + i + ')">\u2715</button></div>';
+      i++;
+    } else {
+      i++;
+    }
+  }
+  if (currentGroup) html += '</div>';
+  panel.innerHTML = html;
 }
 
 function _pushArticleHistory(zim, path) {
@@ -4009,7 +5073,90 @@ function _pushArticleHistory(zim, path) {
   if (articleHistory.length > 50) articleHistory.shift();
 }
 
+// ── Bookmarks (localStorage) ──
+var _bookmarks = null;
+var _BK_KEY = 'zimi_bookmarks';
+var _BK_MAX = 200;
+
+function _bkLoad() {
+  if (_bookmarks !== null) return _bookmarks;
+  try { _bookmarks = JSON.parse(localStorage.getItem(_BK_KEY)) || []; }
+  catch(e) { _bookmarks = []; }
+  return _bookmarks;
+}
+function _bkSave() {
+  if (!_bookmarks) return;
+  try { localStorage.setItem(_BK_KEY, JSON.stringify(_bookmarks)); } catch(e) {}
+}
+function _bkFind(zim, path) {
+  return _bkLoad().findIndex(function(b) { return b.zim === zim && b.path === path; });
+}
+function _bkIsBookmarked(zim, path) { return _bkFind(zim, path) >= 0; }
+function _bkAdd(zim, path, title) {
+  var bk = _bkLoad();
+  if (_bkFind(zim, path) >= 0) return; // already bookmarked
+  bk.unshift({ zim: zim, path: path, title: title || _titleFromPath(path), timestamp: Date.now() });
+  if (bk.length > _BK_MAX) bk.length = _BK_MAX;
+  _bkSave();
+}
+function _bkRemove(zim, path) {
+  var idx = _bkFind(zim, path);
+  if (idx >= 0) { _bkLoad().splice(idx, 1); _bkSave(); }
+}
+function toggleBookmark() {
+  if (!currentArticle) return;
+  var zim = currentArticle.zim, path = currentArticle.path;
+  var title = document.title.replace(/ — Zimi$/, '');
+  if (title === 'Zimi' || !title) title = _titleFromPath(path);
+  if (_bkIsBookmarked(zim, path)) {
+    _bkRemove(zim, path);
+  } else {
+    _bkAdd(zim, path, title);
+  }
+  _updateBookmarkBtn();
+}
+function _updateBookmarkBtn() {
+  var btn = document.getElementById('bookmark-btn');
+  if (!btn) return;
+  if (readerOpen && currentArticle) {
+    btn.style.display = 'flex';
+    var isB = _bkIsBookmarked(currentArticle.zim, currentArticle.path);
+    btn.classList.toggle('bookmarked', isB);
+    btn.title = isB ? 'Remove bookmark (B)' : 'Bookmark (B)';
+  } else {
+    btn.style.display = 'none';
+  }
+}
+function renderBookmarksSection() {
+  var bk = _bkLoad();
+  if (!bk.length) return '';
+  var html = '<div class="bookmarks-section">' +
+    '<div class="discover-label">Bookmarks</div>' +
+    '<div class="bookmarks-grid">';
+  var shown = Math.min(bk.length, 8);
+  for (var i = 0; i < shown; i++) {
+    var b = bk[i];
+    var icon = _sourceIconHtml(b.zim, 24);
+    html += '<div class="bookmark-card" onclick="openArticle(\'' + escJs(b.zim) + '\',\'' + escJs(b.path) + '\',\'' + escJs(b.title || '') + '\')">' +
+      '<div class="bk-icon">' + icon + '</div>' +
+      '<div class="bk-detail"><div class="bk-title">' + esc(b.title || _titleFromPath(b.path)) + '</div>' +
+      '<div class="bk-source">' + esc(_zimTitle(b.zim)) + '</div></div>' +
+      '<button class="bk-remove" onclick="event.stopPropagation();_bkRemove(\'' + escJs(b.zim) + '\',\'' + escJs(b.path) + '\');renderHome()" title="Remove">\u2715</button></div>';
+  }
+  html += '</div>';
+  if (bk.length > 8) {
+    html += '<div style="text-align:center;padding:8px"><button class="hp-clear" onclick="toggleHistoryPanel()" style="font-size:12px">View all ' + bk.length + ' bookmarks</button></div>';
+  }
+  html += '</div>';
+  return html;
+}
+
 function openArticle(zim, path, title) {
+  // Save discover scroll position before navigating away
+  var discScroll = document.querySelector('.discover-scroll');
+  if (discScroll && discScroll.scrollLeft > 0) {
+    try { sessionStorage.setItem('zimi_disc_scroll', String(Math.round(discScroll.scrollLeft))); } catch(e) {}
+  }
   var url = _articleUrl(zim, path);
   readerSource = zim;
   // EPUB: download (Gutenberg has HTML equivalents for all EPUBs)
@@ -4022,6 +5169,8 @@ function openArticle(zim, path, title) {
   // Track article history: push current article before navigating away
   if (currentArticle) _pushArticleHistory(currentArticle.zim, currentArticle.path);
   currentArticle = { zim: zim, path: path };
+  // Persist to browse history (localStorage)
+  _histPushArticle(zim, path, title || _titleFromPath(path));
   // Push state with the original /w/ URL (not the viewer URL) so reload serves SPA shell.
   // PDFs get ?view=1 so CDN caches don't serve raw PDF binary on reload.
   var pushUrl = lurl.endsWith('.pdf') ? url + (url.includes('?') ? '&' : '?') + 'view=1' : url;
@@ -4052,6 +5201,8 @@ function closeReader() {
   var f = document.getElementById('reader-frame');
   try { f.contentWindow.location.replace('about:blank'); } catch(e) { f.src = 'about:blank'; }
   mainView.classList.remove('hidden');
+  // Restore main document scroll (iOS tap-to-top for home page)
+  document.documentElement.style.overflowY = 'auto';
   updateTopbar();
   _setWindowTitle('Zimi');
 }
@@ -4087,6 +5238,8 @@ async function randomArticle(event) {
 // ── Keyboard ──
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
+    var _hp = document.getElementById('history-panel');
+    if (_hp && _hp.classList.contains('open')) { _hp.classList.remove('open'); return; }
     if (suggestDropdown.style.display !== 'none') { hideSuggest(); return; }
     if (readerOpen) { goBack(); return; }
     if (q.value) { q.value = ''; hideSuggest(); clearSearch(); return; }
@@ -4097,6 +5250,8 @@ document.addEventListener('keydown', e => {
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   if (e.key === '/' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); q.focus(); }
   if (e.key === 'r' && !e.metaKey && !e.ctrlKey && !e.altKey && mode !== 'manage') { e.preventDefault(); randomArticle(e); }
+  if (e.key === 'h' && !e.metaKey && !e.ctrlKey && !e.altKey && mode !== 'manage') { e.preventDefault(); toggleHistoryPanel(); }
+  if (e.key === 'b' && !e.metaKey && !e.ctrlKey && !e.altKey && readerOpen) { e.preventDefault(); toggleBookmark(); }
 });
 
 // ── History ──
@@ -4158,7 +5313,7 @@ window.addEventListener('popstate', (e) => {
 function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 function escAttr(s) { return esc(s).replace(/'/g, '&#39;').replace(/"/g, '&quot;'); }
 // Escape for JS string literal inside HTML onclick attribute (survives HTML decode then JS parse)
-function escJs(s) { return (s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+function escJs(s) { return (s || '').replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/'/g, "\\'").replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
 
 // ── Desktop app integration (pywebview) ──
 // pywebview injects window.pywebview AFTER page load, so we can't check at parse time.
@@ -4305,6 +5460,10 @@ async function openSettings() {
   } else {
     browserLink.style.display = 'none';  // Not useful in browser mode
   }
+
+  // Sync Discover toggle
+  var discoverCb = document.getElementById('settings-discover');
+  if (discoverCb) discoverCb.checked = localStorage.getItem('zimi_hide_discover') !== '1';
 
   overlay.classList.add('open');
 }

@@ -4,13 +4,18 @@ The offline internet — searchable, browsable, and self-updating.
 
 Kiwix packages the world's knowledge into ZIM files — compressed offline copies of Wikipedia, Stack Overflow, dev docs, and more. Zimi is a modern server that makes them feel like the real thing.
 
-**What makes it different:**
+**What you get:**
 
-- **Cross-source search** — one query, all your sources, ranked by relevance
-- **Library management** — browse a catalog, install with one click, auto-update on a schedule
-- **JSON API** — every feature accessible programmatically for scripts, bots, and AI agents
-- **Desktop app** — native macOS window with built-in reader, PDF viewer, and navigation history
-- **Runs anywhere** — Homebrew, Snap, Docker, pip, or a standalone AppImage
+- **Cross-source search** — two-stage search: instant title matches first, then deep full-text results. Results ranked by title relevance, source authority, and position — not just keyword hits.
+- **Discover** — daily highlights from your installed sources: Picture of the Day, On This Day, Quote of the Day, Country of the Day, and more. Content rotates daily.
+- **Catalog browser** — visual gallery of 1,000+ Kiwix archives across 10+ categories. One-click install with flavor picker (Mini / No images / Full).
+- **Article reader** — clean dark-theme reader with navigation history, PDF viewer, and cross-ZIM link resolution.
+- **Library management** — auto-update on a schedule, password protection, download queue with progress tracking.
+- **Collections** — group sources into named sets for scoped search and homepage sections.
+- **JSON API** — every feature accessible programmatically for scripts, bots, and integrations.
+- **MCP server** — plug into Claude Code and other AI agents as a knowledge tool.
+- **Desktop app** — native macOS window with system tray, configurable ZIM folder, and browser access.
+- **Runs anywhere** — Homebrew, Snap, Docker, pip, AppImage, or standalone binary.
 
 ## Screenshots
 

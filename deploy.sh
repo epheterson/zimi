@@ -3,7 +3,7 @@
 set -e
 
 echo "=== Deploying to NAS ==="
-ssh nas "mkdir -p /volume1/docker/kiwix/zimi/templates /volume1/docker/kiwix/zimi/assets"
+ssh nas "mkdir -p /volume1/docker/kiwix/zimi/templates /volume1/docker/kiwix/zimi/assets /volume1/docker/kiwix/zimi/static"
 cat zimi/server.py | ssh nas "cat > /volume1/docker/kiwix/zimi/server.py"
 cat zimi/__init__.py | ssh nas "cat > /volume1/docker/kiwix/zimi/__init__.py"
 cat zimi/__main__.py | ssh nas "cat > /volume1/docker/kiwix/zimi/__main__.py"
@@ -11,6 +11,7 @@ cat zimi/mcp_server.py | ssh nas "cat > /volume1/docker/kiwix/zimi/mcp_server.py
 cat zimi/templates/index.html | ssh nas "cat > /volume1/docker/kiwix/zimi/templates/index.html"
 cat zimi/assets/icon.png | ssh nas "cat > /volume1/docker/kiwix/zimi/assets/icon.png"
 cat zimi/assets/apple-touch-icon.png | ssh nas "cat > /volume1/docker/kiwix/zimi/assets/apple-touch-icon.png"
+tar cf - zimi/static/ | ssh nas "cd /volume1/docker/kiwix && tar xf -"
 cat requirements.txt | ssh nas "cat > /volume1/docker/kiwix/requirements.txt"
 cat Dockerfile | ssh nas "cat > /volume1/docker/kiwix/Dockerfile"
 echo "  Files copied"
