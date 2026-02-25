@@ -6,7 +6,7 @@ Kiwix packages the world's knowledge into ZIM files — compressed offline copie
 
 **What you get:**
 
-- **Cross-source search** — two-stage search: instant title matches first, then deep full-text results. Results ranked by title relevance, source authority, and position — not just keyword hits.
+- **Cross-source search** — two-stage search: instant title matches first, then deep full-text results across all ZIMs in parallel. Results ranked by title relevance, source authority, and position — not just keyword hits.
 - **Discover** — daily highlights from your installed sources: Picture of the Day, On This Day, Quote of the Day, Country of the Day, and more. Content rotates daily.
 - **Catalog browser** — visual gallery of 1,000+ Kiwix archives across 10+ categories. One-click install with flavor picker (Mini / No images / Full).
 - **Article reader** — clean dark-theme reader with navigation history, PDF viewer, and cross-ZIM link resolution.
@@ -153,6 +153,7 @@ services:
 | | Zimi | kiwix-serve |
 |---|---|---|
 | **Search API** | JSON responses | HTML responses |
+| **Search performance** | Parallel Xapian FTS (per-ZIM threads) | Sequential |
 | **Cross-source search** | Unified results with relevance ranking | Per-ZIM or combined unranked |
 | **Library management** | Built-in catalog browser, downloads, updates | Separate CLI tool (kiwix-manage) |
 | **AI integration** | MCP server for Claude Code | None |

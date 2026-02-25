@@ -4144,6 +4144,16 @@ def main():
                     pool.submit(_warm_one, name, path)
             log.info("Suggestion indexes warmed: %d/%d", warmed[0], len(zim_files))
         threading.Thread(target=_warm_suggest_indexes, daemon=True).start()
+        # Pre-warm FTS pool in background (opens per-ZIM Archive handles for parallel Xapian search)
+        def _warm_fts_pool():
+            zim_files = get_zim_files()
+            for name in zim_files:
+                try:
+                    _get_fts_archive(name)
+                except Exception:
+                    pass
+            log.info("FTS pool warmed: %d archives", len(_fts_pool))
+        threading.Thread(target=_warm_fts_pool, daemon=True).start()
         # Build SQLite title indexes in background (one-time per ZIM, enables <10ms title search)
         threading.Thread(target=_build_all_title_indexes, daemon=True).start()
         # Start auto-update thread if enabled
