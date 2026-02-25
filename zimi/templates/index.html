@@ -382,6 +382,44 @@
   }
   .manage-btn-action:hover { opacity: 0.85; }
   .manage-btn-action:disabled { opacity: 0.4; cursor: default; }
+  /* macOS-style settings panel */
+  .manage-settings {
+    display: flex; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); margin-bottom: 16px; min-height: 180px; overflow: hidden;
+  }
+  .ms-nav {
+    width: 140px; flex-shrink: 0; border-right: 1px solid var(--border);
+    padding: 8px 0; display: flex; flex-direction: column;
+  }
+  .ms-nav-item {
+    padding: 8px 16px; font-size: 13px; color: var(--text2); cursor: pointer;
+    border: none; background: none; text-align: left; transition: all 0.15s;
+    font-family: inherit;
+  }
+  .ms-nav-item:hover { color: var(--text); background: var(--amber-glow); }
+  .ms-nav-item.active { color: var(--amber); background: var(--amber-glow); }
+  .ms-pane { flex: 1; padding: 16px 20px; }
+  .ms-pane .mc-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 13px; color: var(--text2); padding: 4px 0;
+  }
+  .ms-pane .mc-label { color: var(--text2); }
+  .ms-pane .mc-value { color: var(--text); font-weight: 500; }
+  .ms-pane .ms-actions { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .ms-pane .ms-check {
+    display: flex; align-items: center; gap: 8px; padding: 6px 0; cursor: pointer;
+    font-size: 13px; color: var(--text);
+  }
+  .ms-pane .ms-check input { accent-color: var(--amber); }
+  .ms-pane .ms-field { margin-bottom: 10px; }
+  .ms-pane .ms-field label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .ms-pane .ms-field input {
+    width: 100%; padding: 7px 10px; border-radius: var(--radius); border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); font-size: 13px; box-sizing: border-box;
+  }
+  .ms-pane .ms-field input:focus { outline: none; border-color: var(--amber-border); }
+  .ms-pane .ms-field input[readonly] { opacity: 0.6; }
+  .ms-pane .ms-hint { font-size: 12px; color: var(--text2); opacity: 0.7; margin-top: 8px; }
   .manage-search { margin-bottom: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
   .manage-search input {
     flex: 1; padding: 9px 14px; background: var(--surface); border: 1px solid var(--border);
@@ -628,6 +666,13 @@
     .manage-search input { min-width: 0; }
     .manage-search select { flex-shrink: 0; }
     .manage-card { padding: 16px 12px; }
+    .manage-settings { flex-direction: column; min-height: auto; }
+    .ms-nav {
+      width: auto; flex-shrink: 0; border-right: none; border-bottom: 1px solid var(--border);
+      flex-direction: row; padding: 4px 8px; gap: 2px; overflow-x: auto;
+    }
+    .ms-nav-item { padding: 6px 12px; white-space: nowrap; border-radius: var(--radius); font-size: 12px; }
+    .ms-pane { padding: 14px 12px; }
     .manage-tab { padding: 8px 14px; font-size: 12px; }
     body { overflow-x: hidden; }
     .topbar.search-focused .random-btn,
@@ -982,14 +1027,6 @@
     <div class="field-row" id="settings-port-row">
       <input type="number" id="settings-port" min="1024" max="65535" value="8899">
     </div>
-    <label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;cursor:pointer;text-transform:none;letter-spacing:0">
-      <input type="checkbox" id="settings-hide-xzim" onchange="if(this.checked)localStorage.setItem('zimi_hide_cross_zim_links','1');else localStorage.removeItem('zimi_hide_cross_zim_links')" style="accent-color:var(--amber)">
-      <span style="font-size:13px;color:var(--text)">Hide cross-source link highlights</span>
-    </label>
-    <label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;cursor:pointer;text-transform:none;letter-spacing:0">
-      <input type="checkbox" id="settings-hide-discover" onchange="if(this.checked)localStorage.setItem('zimi_hide_discover','1');else localStorage.removeItem('zimi_hide_discover');renderHome()" style="accent-color:var(--amber)">
-      <span style="font-size:13px;color:var(--text)">Hide Discover</span>
-    </label>
     <div class="hint" id="settings-hint">Changes require a server restart to take effect.</div>
     <div id="settings-browser-link" style="display:none;margin-top:8px;margin-bottom:16px;padding:12px 14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius)">
       <div style="display:flex;align-items:center;justify-content:space-between">
@@ -3960,7 +3997,15 @@ async function renderManage() {
   const installedCount = zimsCache ? zimsCache.length : 0;
 
   output.innerHTML =
-    '<div id="manage-status" class="manage-card"><h2>Library Status</h2><div class="loading"><span class="spinner-inline"></span>Loading...</div></div>' +
+    '<div id="manage-status" class="manage-settings">' +
+      '<div class="ms-nav" id="ms-nav">' +
+        '<button class="ms-nav-item active" data-ms="library" onclick="switchMs(\'library\')">Library</button>' +
+        '<button class="ms-nav-item" data-ms="display" onclick="switchMs(\'display\')">Display</button>' +
+        '<button class="ms-nav-item" data-ms="server" onclick="switchMs(\'server\')">Server</button>' +
+        '<button class="ms-nav-item" data-ms="security" onclick="switchMs(\'security\')">Security</button>' +
+      '</div>' +
+      '<div id="ms-pane" class="ms-pane"><div class="loading"><span class="spinner-inline"></span>Loading\u2026</div></div>' +
+    '</div>' +
     '<div id="manage-downloads"></div>' +
     '<div class="manage-tabs">' +
       '<button class="manage-tab' + (manageTab === 'installed' ? ' active' : '') + '" data-tab="installed" onclick="switchManageTab(\'installed\')">Installed</button>' +
@@ -3980,38 +4025,12 @@ async function renderManage() {
       '<div id="catalog-results"></div>' +
     '</div>';
 
-  // Status card
+  // Status card — fetch data and render into settings panel
   try {
     const res = await manageFetch('/manage/status');
     const data = await res.json();
-    const statusEl = document.getElementById('manage-status');
-    if (statusEl) {
-      statusEl.innerHTML = '<h2>Library Status</h2>' +
-        '<div class="mc-row"><span class="mc-label">ZIM files</span><span class="mc-value">' + esc(String(data.zim_count)) + '</span></div>' +
-        '<div class="mc-row"><span class="mc-label">Total size</span><span class="mc-value">' + fmtSize(data.total_size_gb) + '</span></div>' +
-        '<div id="update-status" class="mc-row"><span class="mc-label">Updates</span><span class="mc-value" style="color:var(--text2)">Checking\u2026</span></div>' +
-        '<div class="mc-row" style="align-items:center">' +
-          '<span class="mc-label">Auto-update</span>' +
-          '<span class="mc-value">' +
-            '<select id="auto-update-freq" onchange="toggleAutoUpdate()" style="font-size:12px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface2);color:var(--text)">' +
-              '<option value="disabled">Disabled</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option>' +
-            '</select>' +
-          '</span>' +
-        '</div>' +
-        '<div style="margin-top:12px;display:flex;gap:8px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap">' +
-          '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-            (IS_DESKTOP
-              ? '<button class="manage-btn-action" onclick="openSettings()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">&#x2699;&#xFE0F; Settings</button>'
-              : '<button id="refresh-cache-btn" class="manage-btn-action" onclick="settingsRefreshCache()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">&#x1F504; Refresh Cache</button>') +
-            '<button class="manage-btn-action" onclick="manageImportZim()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">&#x2B07; Import ZIM</button>' +
-            '<button id="pw-btn" class="manage-btn-action" onclick="managePassword()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">&#x1F512; Password</button>' +
-            (sessionStorage.getItem('zimi_manage_pw') ? '<button class="manage-btn-action" onclick="manageLogout()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)" title="Log out and return to home">Log Out</button>' : '') +
-            (!IS_DESKTOP && localStorage.getItem('zimi_hide_discover') === '1' ? '<button class="manage-btn-action" onclick="localStorage.removeItem(\'zimi_hide_discover\');renderHome();renderManage()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">Show Discover</button>' : '') +
-          '</div>' +
-          '<button id="update-all-btn" class="manage-btn-action" onclick="triggerUpdate()" style="display:none">Update All</button>' +
-        '</div>' +
-        '';
-    }
+    _manageStatusData = data;
+    switchMs('library');
     // Sync auto-update dropdown from server
     const au = data.auto_update || {};
     const freqSel = document.getElementById('auto-update-freq');
@@ -4025,8 +4044,8 @@ async function renderManage() {
     }
     checkForUpdates();
   } catch(e) {
-    const statusEl = document.getElementById('manage-status');
-    if (statusEl) statusEl.innerHTML = '<h2>Library Status</h2><div style="color:var(--text2);font-size:13px">Could not load library status</div>';
+    var pane = document.getElementById('ms-pane');
+    if (pane) pane.innerHTML = '<div style="color:var(--text2);font-size:13px">Could not load library status</div>';
   }
 
   // Render active tab content
@@ -4053,6 +4072,83 @@ async function renderManage() {
   }
 }
 
+// ── macOS-style settings panel sections ──
+var _msSection = 'library';
+var _manageStatusData = null;
+
+function switchMs(section) {
+  _msSection = section;
+  document.querySelectorAll('.ms-nav-item').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.ms === section);
+  });
+  var pane = document.getElementById('ms-pane');
+  if (!pane) return;
+  switch(section) {
+    case 'library': pane.innerHTML = _msLibraryHtml(); break;
+    case 'display': pane.innerHTML = _msDisplayHtml(); break;
+    case 'server': pane.innerHTML = _msServerHtml(); break;
+    case 'security': pane.innerHTML = _msSecurityHtml(); break;
+  }
+}
+
+function _msLibraryHtml() {
+  var d = _manageStatusData;
+  if (!d) return '<div class="loading"><span class="spinner-inline"></span>Loading\u2026</div>';
+  return '<div class="mc-row"><span class="mc-label">ZIM files</span><span class="mc-value">' + esc(String(d.zim_count)) + '</span></div>' +
+    '<div class="mc-row"><span class="mc-label">Total size</span><span class="mc-value">' + fmtSize(d.total_size_gb) + '</span></div>' +
+    '<div id="update-status" class="mc-row"><span class="mc-label">Updates</span><span class="mc-value" style="color:var(--text2)">Checking\u2026</span></div>' +
+    '<div class="mc-row" style="align-items:center">' +
+      '<span class="mc-label">Auto-update</span>' +
+      '<span class="mc-value">' +
+        '<select id="auto-update-freq" onchange="toggleAutoUpdate()" style="font-size:12px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface2);color:var(--text)">' +
+          '<option value="disabled">Disabled</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option>' +
+        '</select>' +
+      '</span>' +
+    '</div>' +
+    '<div class="ms-actions">' +
+      '<button class="manage-btn-action" onclick="manageImportZim()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">Import ZIM</button>' +
+      '<button id="refresh-cache-btn" class="manage-btn-action" onclick="settingsRefreshCache()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">Refresh Cache</button>' +
+      '<button id="update-all-btn" class="manage-btn-action" onclick="triggerUpdate()" style="display:none">Update All</button>' +
+    '</div>';
+}
+
+function _msDisplayHtml() {
+  var hideXzim = localStorage.getItem('zimi_hide_cross_zim_links') === '1';
+  var hideDiscover = localStorage.getItem('zimi_hide_discover') === '1';
+  return '<label class="ms-check"><input type="checkbox"' + (hideXzim ? ' checked' : '') +
+      ' onchange="if(this.checked)localStorage.setItem(\'zimi_hide_cross_zim_links\',\'1\');else localStorage.removeItem(\'zimi_hide_cross_zim_links\')"> Hide cross-source link highlights</label>' +
+    '<label class="ms-check"><input type="checkbox"' + (hideDiscover ? ' checked' : '') +
+      ' onchange="if(this.checked)localStorage.setItem(\'zimi_hide_discover\',\'1\');else localStorage.removeItem(\'zimi_hide_discover\');renderHome()"> Hide Discover</label>';
+}
+
+function _msServerHtml() {
+  if (IS_DESKTOP) {
+    return '<div class="ms-hint">Server configuration is available via the Settings overlay.</div>' +
+      '<div class="ms-actions"><button class="manage-btn-action" onclick="openSettings()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">Open Server Settings</button></div>';
+  }
+  // Docker/server: fetch zim_dir from stats endpoint
+  var h = '<div class="ms-field"><label>ZIM folder</label><input type="text" id="ms-zim-dir" readonly value="Loading\u2026"></div>' +
+    '<div class="ms-hint">Configured via environment variables or Docker.</div>';
+  // Async fill
+  manageFetch('/manage/stats').then(function(r) { return r.json(); }).then(function(s) {
+    var el = document.getElementById('ms-zim-dir');
+    if (el && s.disk && s.disk.zim_dir) el.value = s.disk.zim_dir;
+    else if (el) el.value = '(unknown)';
+  }).catch(function() {
+    var el = document.getElementById('ms-zim-dir');
+    if (el) el.value = '(unavailable)';
+  });
+  return h;
+}
+
+function _msSecurityHtml() {
+  var h = '<div class="ms-actions">' +
+    '<button id="pw-btn" class="manage-btn-action" onclick="managePassword()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">Set / Change Password</button>';
+  if (sessionStorage.getItem('zimi_manage_pw')) {
+    h += '<button class="manage-btn-action" onclick="manageLogout()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">Log Out</button>';
+  }
+  return h + '</div>';
+}
 
 async function toggleAutoUpdate() {
   const freqSel = document.getElementById('auto-update-freq');
@@ -5614,6 +5710,8 @@ window.addEventListener('pywebviewready', function() { _desktopInit(); });
 let _settingsOriginal = {};
 
 async function openSettings() {
+  // Desktop-only: settings overlay for folder/port/save
+  if (!IS_DESKTOP) return;
   const overlay = document.getElementById('settings-overlay');
   const dirInput = document.getElementById('settings-dir');
   const portInput = document.getElementById('settings-port');
@@ -5622,58 +5720,26 @@ async function openSettings() {
   msgEl.className = 'settings-restart-msg';
   msgEl.textContent = '';
 
-  if (IS_DESKTOP) {
-    // Desktop mode: get config from pywebview bridge
-    browseBtn.style.display = '';
-    portInput.readOnly = false;
-    document.getElementById('settings-save-btn').style.display = '';
-    document.getElementById('settings-port-label').style.display = '';
-    document.getElementById('settings-port-row').style.display = '';
-    document.getElementById('settings-hint').style.display = '';
-    try {
-      const cfg = await pywebview.api.get_config();
-      dirInput.value = cfg.zim_dir || '';
-      portInput.value = cfg.port || 8899;
-      _settingsOriginal = { zim_dir: cfg.zim_dir, port: cfg.port };
-    } catch(e) {}
-  } else {
-    // Server mode: show read-only info + useful actions
-    browseBtn.style.display = 'none';
-    dirInput.readOnly = true;
-    document.getElementById('settings-save-btn').style.display = 'none';
-    document.getElementById('settings-port-label').style.display = 'none';
-    document.getElementById('settings-port-row').style.display = 'none';
-    document.getElementById('settings-hint').textContent = 'Settings are configured via environment variables or Docker.';
-    try {
-      const r = await manageFetch('/manage/stats');
-      if (r.ok) {
-        const s = await r.json();
-        if (s.disk && s.disk.zim_dir) dirInput.value = s.disk.zim_dir;
-      }
-    } catch(e) {}
-    _settingsOriginal = {};
-  }
+  browseBtn.style.display = '';
+  portInput.readOnly = false;
+  document.getElementById('settings-save-btn').style.display = '';
+  document.getElementById('settings-port-label').style.display = '';
+  document.getElementById('settings-port-row').style.display = '';
+  document.getElementById('settings-hint').style.display = '';
+  try {
+    const cfg = await pywebview.api.get_config();
+    dirInput.value = cfg.zim_dir || '';
+    portInput.value = cfg.port || 8899;
+    _settingsOriginal = { zim_dir: cfg.zim_dir, port: cfg.port };
+  } catch(e) {}
 
   // Show "Open in browser" link
   const browserLink = document.getElementById('settings-browser-link');
   const browserUrl = document.getElementById('settings-browser-url');
-  const browserLabel = document.getElementById('settings-browser-label');
-  if (IS_DESKTOP) {
-    const url = 'http://localhost:' + (portInput.value || 8899);
-    browserUrl.href = url;
-    browserUrl.textContent = url;
-    browserLabel.textContent = 'Access from any browser on this computer';
-    browserLink.style.display = '';
-  } else {
-    browserLink.style.display = 'none';  // Not useful in browser mode
-  }
-
-  // Sync cross-ZIM toggle
-  var xzimCb = document.getElementById('settings-hide-xzim');
-  if (xzimCb) xzimCb.checked = localStorage.getItem('zimi_hide_cross_zim_links') === '1';
-  // Sync Discover toggle
-  var hideDiscCb = document.getElementById('settings-hide-discover');
-  if (hideDiscCb) hideDiscCb.checked = localStorage.getItem('zimi_hide_discover') === '1';
+  const url = 'http://localhost:' + (portInput.value || 8899);
+  browserUrl.href = url;
+  browserUrl.textContent = url;
+  browserLink.style.display = '';
 
   overlay.classList.add('open');
 }
@@ -5719,11 +5785,10 @@ let _refreshing = false;
 async function settingsRefreshCache() {
   if (_refreshing) return;
   _refreshing = true;
-  // Works both from settings overlay and standalone (manage view button)
+  // Works from settings overlay (desktop) or inline settings panel
   const msgEl = document.getElementById('settings-restart-msg');
   const btn = document.getElementById('refresh-cache-btn');
-  const zimRow = document.querySelector('#manage-status .mc-value');
-  if (btn) { btn.disabled = true; btn.textContent = '\u23F3 Refreshing\u2026'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Refreshing\u2026'; }
   if (msgEl) {
     msgEl.textContent = 'Refreshing cache\u2026';
     msgEl.className = 'settings-restart-msg show';
@@ -5733,17 +5798,18 @@ async function settingsRefreshCache() {
     if (msgEl) msgEl.textContent = 'Cache refreshed.';
     // Reload ZIM list
     try { const lr = await fetch('/list'); zimsCache = await lr.json(); } catch(e) {}
-    if (btn) btn.textContent = '\u2705 Refreshed';
-    if (msgEl && document.getElementById('settings-overlay').classList.contains('open')) {
-      setTimeout(() => { closeSettings(); renderManage(); }, 800);
+    if (btn) btn.textContent = 'Refreshed';
+    var overlay = document.getElementById('settings-overlay');
+    if (msgEl && overlay && overlay.classList.contains('open')) {
+      setTimeout(function() { closeSettings(); renderManage(); }, 800);
     } else {
       renderManage();
     }
   } catch(e) {
     if (msgEl) msgEl.textContent = 'Failed to refresh cache.';
-    if (btn) btn.textContent = '\u274C Failed';
+    if (btn) btn.textContent = 'Failed';
   } finally {
-    setTimeout(() => { _refreshing = false; }, 2000);
+    setTimeout(function() { _refreshing = false; }, 2000);
   }
 }
 
