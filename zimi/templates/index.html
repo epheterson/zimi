@@ -4003,6 +4003,7 @@ async function renderManage() {
             (IS_DESKTOP
               ? '<button class="manage-btn-action" onclick="openSettings()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">&#x2699;&#xFE0F; Settings</button>'
               : '<button id="refresh-cache-btn" class="manage-btn-action" onclick="settingsRefreshCache()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">&#x1F504; Refresh Cache</button>') +
+            '<button class="manage-btn-action" onclick="manageImportZim()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">&#x2B07; Import ZIM</button>' +
             '<button id="pw-btn" class="manage-btn-action" onclick="managePassword()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">&#x1F512; Password</button>' +
             (sessionStorage.getItem('zimi_manage_pw') ? '<button class="manage-btn-action" onclick="manageLogout()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)" title="Log out and return to home">Log Out</button>' : '') +
             (!IS_DESKTOP && localStorage.getItem('zimi_hide_discover') === '1' ? '<button class="manage-btn-action" onclick="localStorage.removeItem(\'zimi_hide_discover\');renderHome();renderManage()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">Show Discover</button>' : '') +
@@ -4360,6 +4361,33 @@ async function _downloadPackFromSelects(btn) {
     }
   });
   if (urls.length) await _downloadPack(btn, urls);
+}
+
+async function manageImportZim() {
+  var url = prompt('Enter the HTTPS URL of a .zim file to import:');
+  if (!url || !url.trim()) return;
+  url = url.trim();
+  if (!url.startsWith('https://')) {
+    _showToast('URL must start with https://');
+    return;
+  }
+  if (!/\.zim(\?|#|$)/.test(url)) {
+    _showToast('URL must point to a .zim file');
+    return;
+  }
+  try {
+    var resp = await manageFetch('/manage/import', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({url: url})
+    });
+    var data = await resp.json();
+    if (!resp.ok) { _showToast(data.error || 'Import failed'); return; }
+    _showToast('Import started: ' + url.split('/').pop().split('?')[0]);
+    renderManage();
+  } catch(e) {
+    _showToast('Import failed: ' + e.message);
+  }
 }
 
 async function downloadZim(url, btn, isUpdate) {

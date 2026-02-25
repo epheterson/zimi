@@ -2775,6 +2775,43 @@ def _start_download(url):
     return dl_id, None
 
 
+def _start_import(url):
+    """Start a background download from any HTTPS URL. Returns download ID."""
+    global _download_counter
+    if not url.startswith("https://"):
+        return None, "URL must use HTTPS"
+
+    # Strip query string and fragment before extracting filename
+    clean_url = url.split("?")[0].split("#")[0]
+    filename = clean_url.split("/")[-1]
+    filename = os.path.basename(filename)
+    if not filename or ".." in filename:
+        return None, "Invalid filename in URL"
+    if not filename.endswith(".zim"):
+        return None, "Only .zim files can be imported"
+    if not re.match(r'^[\w.\-]+$', filename):
+        return None, "Invalid characters in filename"
+    dest = os.path.join(ZIM_DIR, filename)
+
+    with _download_lock:
+        _download_counter += 1
+        dl_id = str(_download_counter)
+        dl = {
+            "id": dl_id,
+            "url": url,
+            "filename": filename,
+            "dest": dest,
+            "started": time.time(),
+            "done": False,
+            "error": None,
+            "is_update": False,
+        }
+        _active_downloads[dl_id] = dl
+        t = threading.Thread(target=_download_thread, args=(dl,), daemon=True)
+        t.start()
+    return dl_id, None
+
+
 def _get_downloads():
     """Get status of all active/completed downloads."""
     results = []
@@ -3385,6 +3422,15 @@ class ZimHandler(BaseHTTPRequestHandler):
                 if not url:
                     return self._json(400, {"error": "missing 'url' in request body"})
                 dl_id, err = _start_download(url)
+                if err:
+                    return self._json(400, {"error": err})
+                return self._json(200, {"status": "started", "id": dl_id})
+
+            elif parsed.path == "/manage/import" and ZIMI_MANAGE:
+                url = data.get("url", "")
+                if not url:
+                    return self._json(400, {"error": "missing 'url' in request body"})
+                dl_id, err = _start_import(url)
                 if err:
                     return self._json(400, {"error": err})
                 return self._json(200, {"status": "started", "id": dl_id})
