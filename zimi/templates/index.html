@@ -5072,8 +5072,7 @@ function openReader(url) {
     var _currentZim = readerSource || (currentArticle && currentArticle.zim) || '';
     if (localStorage.getItem('zimi_hide_cross_zim_links') !== '1' && Object.keys(_domainZimMap).length > 0 && !_frameLoc.startsWith('/static/')) try {
       var styleEl = frame.contentDocument.createElement('style');
-      styleEl.textContent = '.zimi-xzim{text-decoration-style:dotted;text-decoration-color:var(--amber,#f59e0b)}' +
-        '.zimi-dead{opacity:0.5;text-decoration:line-through}';
+      styleEl.textContent = '.zimi-xzim{text-decoration-style:dotted;text-decoration-color:var(--amber,#f59e0b)}';
       frame.contentDocument.head.appendChild(styleEl);
       // Collect external URLs that might resolve to installed ZIMs
       var urlMap = {}; // url → [anchor elements]
@@ -5112,16 +5111,6 @@ function openReader(url) {
             if (!anchors) continue;
             if (results[u].found && results[u].zim !== _currentZim) {
               anchors.forEach(function(a) { a.classList.add('zimi-xzim'); });
-            } else if (!results[u].found) {
-              // Only dim links to a different ZIM's domain — missing paths in
-              // the same source are expected (subset ZIMs don't have every article)
-              try {
-                var _dh = new URL(u).hostname.replace(/^www\./, '');
-                var _dz = _domainZimMap[_dh] || _domainZimMap[new URL(u).hostname];
-                if (_dz && _dz !== _currentZim) {
-                  anchors.forEach(function(a) { a.classList.add('zimi-dead'); });
-                }
-              } catch(ex) {}
             }
           }
         };
