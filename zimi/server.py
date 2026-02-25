@@ -408,6 +408,9 @@ def _suggest_cache_clear():
     with _suggest_pool_lock:
         _suggest_pool.clear()
         _suggest_zim_locks.clear()
+    with _fts_pool_lock:
+        _fts_pool.clear()
+        _fts_zim_locks.clear()
 
 # MIME type fallback for ZIM entries with empty mimetype
 MIME_FALLBACK = {
@@ -560,6 +563,12 @@ _zim_lock = threading.Lock()      # serializes all libzim operations (C library 
 _suggest_pool = {}   # {name: Archive} — independent handles for SuggestionSearcher
 _suggest_pool_lock = threading.Lock()  # protects _suggest_pool writes
 _suggest_zim_locks = {}  # {name: Lock} — per-ZIM lock for suggestion operations
+
+# Separate archive handles for full-text search — allows parallel Xapian FTS across ZIMs.
+# Same pattern as _suggest_pool: each ZIM gets its own Archive + Lock.
+_fts_pool = {}       # {name: Archive}
+_fts_pool_lock = threading.Lock()
+_fts_zim_locks = {}  # {name: Lock}
 
 # ── SQLite Title Index ──
 # Persistent title index per ZIM for instant prefix search (<10ms vs 40s for large ZIMs).
@@ -1251,6 +1260,26 @@ def _get_suggest_archive(name):
     return None, None
 
 
+def _get_fts_archive(name):
+    """Get an FTS-dedicated Archive handle and per-ZIM lock.
+
+    Same pattern as _get_suggest_archive: each ZIM gets its own Archive + Lock,
+    allowing parallel Xapian full-text searches across different ZIMs.
+    """
+    if name in _fts_pool:
+        return _fts_pool[name], _fts_zim_locks[name]
+    zims = get_zim_files()
+    if name in zims:
+        with _fts_pool_lock:
+            if name in _fts_pool:
+                return _fts_pool[name], _fts_zim_locks[name]
+            archive = open_archive(zims[name])
+            _fts_pool[name] = archive
+            _fts_zim_locks[name] = threading.Lock()
+            return archive, _fts_zim_locks[name]
+    return None, None
+
+
 def suggest_search_zim(archive, query_str, limit=5):
     """Fast title search via SuggestionSearcher (B-tree, ~10-50ms any ZIM size)."""
     results = []
@@ -1453,29 +1482,43 @@ def search_all(query_str, limit=5, filter_zim=None, fast=False):
                     })
                 by_source[name] = len(valid)
     else:
-        # ── Full path: Xapian FTS — search every ZIM, no budgets ──
-        for name in target_names:
+        # ── Full path: Xapian FTS — search every ZIM in parallel ──
+        # Each ZIM gets its own Archive handle + per-ZIM lock via _fts_pool,
+        # so Xapian queries run concurrently (bounded by slowest ZIM, not sum).
+        fts_results = {}  # {name: (results_list, dt)}
+
+        def _fts_one_zim(name):
             try:
+                archive, lock = _get_fts_archive(name)
+                if archive is None or lock is None:
+                    return
                 t0 = time.time()
-                archive = get_archive(name)
-                if archive is None:
-                    archive = open_archive(zims[name])
-                results = search_zim(archive, cleaned, limit=limit, snippets=False)
+                with lock:
+                    results = search_zim(archive, cleaned, limit=limit, snippets=False)
                 dt = time.time() - t0
-                if dt > 0.3:
-                    timings.append(f"{name}={dt:.1f}s")
-                valid = [r for r in results if "error" not in r and not _junk_re.search(r.get("path", ""))]
-                if valid:
-                    entry_count = cache_meta.get(name, 1)
-                    for rank, r in enumerate(valid):
-                        score = _score_result(r["title"], query_words, rank, entry_count)
-                        raw_results.append({
-                            "zim": name, "path": r["path"], "title": r["title"],
-                            "snippet": r.get("snippet", ""), "score": round(score, 1),
-                        })
-                    by_source[name] = len(valid)
+                fts_results[name] = (results, dt)
             except Exception:
                 pass
+
+        threads = [threading.Thread(target=_fts_one_zim, args=(n,), daemon=True) for n in target_names]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=30)  # Don't wait forever for a single ZIM
+
+        for name, (results, dt) in fts_results.items():
+            if dt > 0.3:
+                timings.append(f"{name}={dt:.1f}s")
+            valid = [r for r in results if "error" not in r and not _junk_re.search(r.get("path", ""))]
+            if valid:
+                entry_count = cache_meta.get(name, 1)
+                for rank, r in enumerate(valid):
+                    score = _score_result(r["title"], query_words, rank, entry_count)
+                    raw_results.append({
+                        "zim": name, "path": r["path"], "title": r["title"],
+                        "snippet": r.get("snippet", ""), "score": round(score, 1),
+                    })
+                by_source[name] = len(valid)
 
     if timings:
         log.info("  slow zims: %s", ", ".join(timings))
@@ -2091,8 +2134,37 @@ def _extract_preview(archive, zim_name, path):
                         result["blurb"] = def_text[:200]
                     break
         else:
-            # No English section — flag for the random endpoint to skip
-            result["non_english"] = True
+            # No <h2 id="English"> — could be Simple Wiktionary (monolingual, no language headers)
+            # or a non-English entry. Check if page has any <ol><li> definitions.
+            is_simple = "simple" in zim_name.lower()
+            if is_simple:
+                # Simple Wiktionary: treat entire page as English content
+                eng_section = html_str[:30000]
+                # Part of speech: look for bold/italic patterns like "<b>word</b> (<i>noun</i>)"
+                for pos_m in re.finditer(r'<h[34][^>]*>(.*?)</h', eng_section, re.DOTALL | re.IGNORECASE):
+                    pos_text = strip_html(pos_m.group(1)).strip()
+                    if pos_text.lower() in ('noun', 'verb', 'adjective', 'adverb', 'pronoun', 'preposition',
+                                             'conjunction', 'interjection', 'determiner', 'particle', 'prefix', 'suffix'):
+                        result["part_of_speech"] = pos_text
+                        break
+                if not result.get("part_of_speech"):
+                    # Try inline pattern: (noun), (verb), etc.
+                    pos_inline = re.search(r'\((\w+)\)', eng_section[:3000])
+                    if pos_inline and pos_inline.group(1).lower() in ('noun', 'verb', 'adjective', 'adverb'):
+                        result["part_of_speech"] = pos_inline.group(1).capitalize()
+                _boring_def = re.compile(r'^(plural of |third-person |simple past |past participle |present participle |alternative |archaic |obsolete |misspelling |eye dialect |nonstandard )', re.IGNORECASE)
+                for def_m in re.finditer(r'<ol[^>]*>\s*<li[^>]*>(.*?)</li>', eng_section, re.DOTALL):
+                    def_text = strip_html(def_m.group(1)).strip()
+                    def_text = re.split(r'\n', def_text)[0].strip()
+                    if len(def_text) > 5 and not def_text.startswith(('Category:', 'See also')):
+                        if _boring_def.match(def_text):
+                            result["boring"] = True
+                        else:
+                            result["blurb"] = def_text[:200]
+                        break
+            else:
+                # Full Wiktionary, no English section — flag for the random endpoint to skip
+                result["non_english"] = True
 
     # -- Blurb: og:description > meta description > first <p> --
     if not result["blurb"]:
@@ -2950,11 +3022,11 @@ class ZimHandler(BaseHTTPRequestHandler):
                     return self._json(200, cached)
                 t0 = time.time()
                 if fast:
-                    # Fast path uses _suggest_op_lock internally, no _zim_lock needed
+                    # Fast path uses _suggest_pool internally, no _zim_lock needed
                     result = search_all(q, limit=limit, filter_zim=filter_zim, fast=True)
                 else:
-                    with _zim_lock:
-                        result = search_all(q, limit=limit, filter_zim=filter_zim)
+                    # FTS path uses _fts_pool (per-ZIM locks), no _zim_lock needed
+                    result = search_all(q, limit=limit, filter_zim=filter_zim)
                 dt = time.time() - t0
                 _search_cache_put(cache_key, result)
                 _record_metric("/search", dt)
@@ -3079,9 +3151,12 @@ class ZimHandler(BaseHTTPRequestHandler):
                                     if resolved:
                                         thumbnail = f"/w/{zim}/{resolved}"
                                         break
-                        # Fallback: first substantial <img> in content
+                        # Fallback: best <img> in content — skip icons/badges, prefer larger images
                         if not thumbnail:
-                            for img_m2 in re.finditer(r'<img\b([^>]*)>', text[:10000], re.IGNORECASE):
+                            _skip_img = re.compile(r'icon|badge|logo|arrow|button|sprite|spacer|1x1|pixel|emoji|flag.*\.svg', re.IGNORECASE)
+                            best_img = None
+                            best_area = 0
+                            for img_m2 in re.finditer(r'<img\b([^>]*)>', text[:15000], re.IGNORECASE):
                                 attrs = img_m2.group(1)
                                 src_m = re.search(r'src=["\']([^"\']+)["\']', attrs)
                                 if not src_m:
@@ -3089,15 +3164,25 @@ class ZimHandler(BaseHTTPRequestHandler):
                                 src = src_m.group(1)
                                 if src.startswith(("data:", "http", "//")) or src.lower().endswith(".svg"):
                                     continue
+                                if _skip_img.search(src) or _skip_img.search(attrs):
+                                    continue
                                 w_m = re.search(r'width=["\']?(\d+)', attrs)
                                 h_m = re.search(r'height=["\']?(\d+)', attrs)
-                                w = int(w_m.group(1)) if w_m else 200
-                                h = int(h_m.group(1)) if h_m else 150
-                                if w >= 60 and h >= 40:
+                                w = int(w_m.group(1)) if w_m else 0
+                                h = int(h_m.group(1)) if h_m else 0
+                                # Skip explicitly tiny images
+                                if (w > 0 and w < 60) or (h > 0 and h < 40):
+                                    continue
+                                area = (w or 200) * (h or 150)
+                                if area > best_area:
                                     resolved = _resolve_img_path(archive, path, src)
                                     if resolved:
-                                        thumbnail = f"/w/{zim}/{resolved}"
-                                        break
+                                        best_img = f"/w/{zim}/{resolved}"
+                                        best_area = area
+                                        if area >= 200 * 150:
+                                            break  # Good enough — stop scanning
+                            if best_img:
+                                thumbnail = best_img
                     except (KeyError, Exception):
                         pass
                 _record_metric("/snippet", time.time() - t0)
