@@ -912,6 +912,7 @@
   .discover-card.dc-no-click { cursor: default; }
   .discover-card.dc-no-click:hover { background: var(--surface); border-color: var(--border); box-shadow: none; transform: none; }
   .dc-thumb { width: 100%; min-height: 120px; height: 120px; object-fit: cover; display: block; background: var(--surface2); }
+  .dc-thumb.dc-book-cover { object-fit: contain; background: #1a1a1e; }
   .dc-body { padding: 8px 12px 10px; flex: 1; display: flex; flex-direction: column; gap: 2px; }
   .dc-source { font-size: 11px; color: var(--text2); display: flex; align-items: center; gap: 6px; }
   .dc-zim-icon { width: 16px; height: 16px; border-radius: 3px; background: #fff; flex-shrink: 0; }
@@ -1286,41 +1287,50 @@ function updateFooter() {
 // ── Init ──
 async function init() {
   output.innerHTML = '<div class="loading"><span class="spinner-inline"></span>Loading library\u2026</div>';
+  // Only block on /list — everything else loads in background
   try {
     const res = await fetch('/list');
     zimsCache = await res.json();
   } catch(e) { zimsCache = []; }
-  try {
-    const mres = await fetch('/manage/status');  // plain fetch — don't prompt for password on homepage
-    if (mres.ok) {
-      const mdata = await mres.json();
-      manageEnabled = !!mdata.manage_enabled;
-    } else if (mres.status === 401) {
-      manageEnabled = true;  // manage exists but needs password
-    }
-  } catch(e) {}
-  // Fetch collections/favorites (public, no auth needed)
-  try {
-    const cres = await fetch('/collections');
-    if (cres.ok) collectionsCache = await cres.json();
-  } catch(e) {}
-  // Fetch version for footer
-  try {
-    const hres = await fetch('/health');
-    if (hres.ok) {
-      const hdata = await hres.json();
-      if (hdata.version) document.getElementById('footer-version').textContent = hdata.version + ' ';
-    }
-  } catch(e) {}
-  // Fetch domain→ZIM map for cross-ZIM navigation + link highlighting
-  try {
-    const dres = await fetch('/resolve?domains=1');
-    if (dres.ok) _domainZimMap = await dres.json();
-  } catch(e) {}
-  // Set initial history state so browser back always has a valid SPA state
+  // Render immediately with what we have
   if (!history.state) history.replaceState({ mode: 'home' }, '', location.href);
   route(false);
   _desktopCheckOnboarding();
+  // Fetch secondary data in parallel, update UI as each arrives
+  _initSecondary();
+}
+
+async function _initSecondary() {
+  var needsRerender = false;
+  await Promise.allSettled([
+    // Manage status
+    fetch('/manage/status').then(async mres => {
+      if (mres.ok) {
+        const mdata = await mres.json();
+        manageEnabled = !!mdata.manage_enabled;
+      } else if (mres.status === 401) {
+        manageEnabled = true;
+      }
+      needsRerender = true;
+    }).catch(function(){}),
+    // Collections/favorites
+    fetch('/collections').then(async cres => {
+      if (cres.ok) { collectionsCache = await cres.json(); needsRerender = true; }
+    }).catch(function(){}),
+    // Version for footer
+    fetch('/health').then(async hres => {
+      if (hres.ok) {
+        const hdata = await hres.json();
+        if (hdata.version) document.getElementById('footer-version').textContent = hdata.version + ' ';
+      }
+    }).catch(function(){}),
+    // Domain→ZIM map for cross-ZIM links
+    fetch('/resolve?domains=1').then(async dres => {
+      if (dres.ok) _domainZimMap = await dres.json();
+    }).catch(function(){})
+  ]);
+  // Re-render homepage if manage/collections changed (adds collection sections, manage button)
+  if (needsRerender && !readerOpen && !activeSource) renderHome();
 }
 
 function route(push) {
@@ -2098,7 +2108,8 @@ function _renderDiscover(el, items) {
     var thumbHtml;
     var hasGoodThumb = it.thumbnail && !/home_on\.png|banner_ext|photo_on\.gif/i.test(it.thumbnail);
     if (hasGoodThumb) {
-      thumbHtml = '<img class="dc-thumb" src="' + escAttr(it.thumbnail) + '" loading="lazy" onerror="this.style.display=\'none\'" onload="if(this.naturalWidth<80||this.naturalHeight<60)this.style.display=\'none\'">';
+      var thumbClass = 'dc-thumb' + (/gutenberg/i.test(it.zim || '') ? ' dc-book-cover' : '');
+      thumbHtml = '<img class="' + thumbClass + '" src="' + escAttr(it.thumbnail) + '" loading="lazy" onerror="this.style.display=\'none\'" onload="if(this.naturalWidth<80||this.naturalHeight<60)this.style.display=\'none\'">';
     } else if (it.label === 'Country of the Day') {
       thumbHtml = '<div class="dc-icon-thumb" style="background:linear-gradient(135deg,#0a1628,#162040)"><span style="font-size:40px;line-height:1">&#x1F30D;</span></div>';
     } else {

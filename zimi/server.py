@@ -2163,25 +2163,52 @@ def _extract_preview(archive, zim_name, path):
                     result["blurb"] = text[:200]
                     break
 
-    # -- Gutenberg: extract author from dc.creator meta --
+    # -- Gutenberg: extract author and cover image --
+    # Gutenberg cover pages have a ~90KB localization JSON in <head>, pushing actual
+    # content to byte 95K+. Use the full html_str (80K) but also try the tail end.
     if "gutenberg" in zim_name.lower():
-        creator_m = re.search(r'<meta\s+content="([^"]+)"\s+name="dc\.creator"', html_str[:8000], re.IGNORECASE)
-        if not creator_m:
-            creator_m = re.search(r'<meta\s+name="dc\.creator"\s+content="([^"]+)"', html_str[:8000], re.IGNORECASE)
-        if creator_m:
-            author = creator_m.group(1).strip()
+        # For cover pages, re-read with larger limit to get past the l10n blob
+        gut_html = html_str
+        if "_cover" in path and len(html_str) >= 79000:
+            try:
+                content = bytes(entry.get_item().content)
+                gut_html = content.decode("utf-8", errors="replace")[:120000]
+            except Exception:
+                pass
+        # Author: try data-author-name attribute first (modern ZIMs), then dc.creator meta
+        author = None
+        author_btn = re.search(r'data-author-name="([^"]+)"', gut_html, re.IGNORECASE)
+        if author_btn:
+            author = author_btn.group(1).strip()
+        if not author:
+            creator_m = re.search(r'<meta\s+content="([^"]+)"\s+name="dc\.creator"', gut_html[:8000], re.IGNORECASE)
+            if not creator_m:
+                creator_m = re.search(r'<meta\s+name="dc\.creator"\s+content="([^"]+)"', gut_html[:8000], re.IGNORECASE)
+            if creator_m:
+                author = creator_m.group(1).strip()
+        if author:
             # Convert "Last, First, dates" → "First Last"
             if ',' in author:
                 parts = author.split(',')
                 last = parts[0].strip()
                 first = parts[1].strip() if len(parts) > 1 else ''
-                # Skip date-like parts (e.g. "1808-1889")
                 if first and not re.match(r'^\d', first):
                     author = first + ' ' + last
                 else:
                     author = last
-            if author and author.lower() != 'various':
+            if author.lower() != 'various':
                 result["author"] = author[:100]
+        # Cover image: look for .cover-art img (Gutenberg cover pages)
+        if not result["thumbnail"]:
+            cover_m = re.search(r'<img[^>]*class="[^"]*cover-art[^"]*"[^>]*src=["\']([^"\']+)["\']', gut_html, re.IGNORECASE)
+            if not cover_m:
+                cover_m = re.search(r'<img[^>]*src=["\']([^"\']*cover_image[^"\']*)["\']', gut_html, re.IGNORECASE)
+            if cover_m:
+                src = cover_m.group(1)
+                if not src.startswith(("http", "//", "data:")):
+                    resolved = _resolve_img_path(archive, path, src)
+                    if resolved:
+                        result["thumbnail"] = f"/w/{zim_name}/{resolved}"
 
     # -- Wiktionary: extract definition and part of speech (English only) --
     if "wiktionary" in zim_name.lower():
@@ -3298,7 +3325,8 @@ class ZimHandler(BaseHTTPRequestHandler):
                 want_thumb = param("thumb") == "1"
                 require_thumb = param("require_thumb") == "1"
                 is_wiktionary = "wiktionary" in pick_name.lower()
-                max_tries = 50 if is_wiktionary else (5 if require_thumb else 1)
+                is_gutenberg = "gutenberg" in pick_name.lower()
+                max_tries = 50 if is_wiktionary else (20 if is_gutenberg else (5 if require_thumb else 1))
                 t0 = time.time()
                 with _zim_lock:
                     archive = get_archive(pick_name)
@@ -3325,6 +3353,12 @@ class ZimHandler(BaseHTTPRequestHandler):
                         preview = None
                         if want_thumb:
                             preview = _extract_preview(archive, pick_name, result["path"])
+                    # Gutenberg: prefer cover pages (book landing pages, not author indexes)
+                    if is_gutenberg and "_cover" not in result.get("path", ""):
+                        if best_result is None:
+                            best_result = result
+                            best_preview = preview
+                        continue
                     # Skip non-English or boring wiktionary entries (retry)
                     if is_wiktionary and preview and (preview.get("non_english") or preview.get("boring")):
                         if best_result is None:

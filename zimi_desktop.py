@@ -155,20 +155,41 @@ class ServerThread(threading.Thread):
             zimi.load_cache()
             zimi._migrate_data_files()
 
-            # Pre-warm archives and suggestion indexes
-            zims = zimi.get_zim_files()
-            for name in zims:
-                try:
-                    zimi.get_archive(name)
-                except Exception:
-                    pass
-
-            # Build title indexes in background (enables fast <10ms title search)
-            threading.Thread(target=zimi._build_all_title_indexes, daemon=True).start()
-
             from http.server import ThreadingHTTPServer
             server = ThreadingHTTPServer(("127.0.0.1", port), zimi.ZimHandler)
-            self.ready.set()
+            self.ready.set()  # UI can load now — /list works from cache
+
+            # Restore suggest cache (instant, from JSON file)
+            loaded = zimi._suggest_cache_restore()
+
+            # Pre-warm archives and indexes in background (non-blocking)
+            def _warm():
+                zims = zimi.get_zim_files()
+                for name in zims:
+                    try:
+                        zimi.get_archive(name)
+                    except Exception:
+                        pass
+                zimi._build_all_title_indexes()
+                # Warm suggest/FTS pools and title index connections
+                for name in zims:
+                    try:
+                        zimi._get_suggest_archive(name)
+                    except Exception:
+                        pass
+                    try:
+                        zimi._get_fts_archive(name)
+                    except Exception:
+                        pass
+                    conn = zimi._get_title_db(name)
+                    if conn:
+                        try:
+                            for prefix in ("a", "m", "s"):
+                                conn.execute("SELECT title FROM titles WHERE title_lower >= ? LIMIT 1", (prefix,)).fetchone()
+                        except Exception:
+                            pass
+            threading.Thread(target=_warm, daemon=True).start()
+
             server.serve_forever()
         except Exception as e:
             self.error = str(e)
