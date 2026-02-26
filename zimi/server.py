@@ -4246,14 +4246,26 @@ def main():
         threading.Thread(target=_warm_fts_pool, daemon=True).start()
         # Build SQLite title indexes in background (one-time per ZIM, enables <10ms title search)
         threading.Thread(target=_build_all_title_indexes, daemon=True).start()
-        # Pre-warm title index SQLite connections (opens DB handles, no heavy I/O)
+        # Pre-warm title index B-tree pages for fast first queries
+        # For each ZIM, read a few rows at scattered prefixes (a, m, s) to pull
+        # B-tree branch pages into OS page cache. Reads ~10-50KB per ZIM total
+        # (3 branch paths × a few pages each) — far less than the full indexes.
         def _warm_title_indexes():
             zim_files = get_zim_files()
             opened = 0
             for name in zim_files:
-                if _get_title_db(name) is not None:
+                conn = _get_title_db(name)
+                if conn is not None:
+                    try:
+                        for prefix in ("a", "m", "s"):
+                            conn.execute(
+                                "SELECT title FROM titles WHERE title_lower >= ? LIMIT 1",
+                                (prefix,)
+                            ).fetchone()
+                    except Exception:
+                        pass
                     opened += 1
-            log.info("Title indexes opened: %d/%d", opened, len(zim_files))
+            log.info("Title indexes warmed: %d/%d", opened, len(zim_files))
         threading.Thread(target=_warm_title_indexes, daemon=True).start()
         # Restore suggest cache from disk (instant warm queries after restart)
         loaded = _suggest_cache_restore()
