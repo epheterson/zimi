@@ -4195,6 +4195,20 @@ def main():
         threading.Thread(target=_warm_fts_pool, daemon=True).start()
         # Build SQLite title indexes in background (one-time per ZIM, enables <10ms title search)
         threading.Thread(target=_build_all_title_indexes, daemon=True).start()
+        # Pre-warm title index SQLite connections (opens DB handles + mmap pages)
+        def _warm_title_indexes():
+            zim_files = get_zim_files()
+            opened = 0
+            for name in zim_files:
+                if _get_title_db(name) is not None:
+                    # Run a trivial query to warm the B-tree pages into OS cache
+                    try:
+                        _title_index_search(name, "a", limit=1)
+                    except Exception:
+                        pass
+                    opened += 1
+            log.info("Title indexes warmed: %d/%d", opened, len(zim_files))
+        threading.Thread(target=_warm_title_indexes, daemon=True).start()
         # Start auto-update thread if enabled
         if _auto_update_enabled:
             _auto_update_thread = threading.Thread(target=_auto_update_loop, daemon=True)
