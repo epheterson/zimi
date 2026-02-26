@@ -395,22 +395,73 @@ def _suggest_cache_get(query_lower, zim_name):
         del _suggest_cache[key]
     return None
 
+_suggest_cache_puts = 0  # count puts since last persist
+
 def _suggest_cache_put(query_lower, zim_name, results):
+    global _suggest_cache_puts
     with _suggest_cache_lock:
         if len(_suggest_cache) >= _SUGGEST_CACHE_MAX:
             oldest = min(_suggest_cache, key=lambda k: _suggest_cache[k]["ts"])
             del _suggest_cache[oldest]
         _suggest_cache[(query_lower, zim_name)] = {"results": results, "ts": time.time()}
+        _suggest_cache_puts += 1
+        should_persist = (_suggest_cache_puts % 50 == 0)
+    if should_persist:
+        threading.Thread(target=_suggest_cache_persist, daemon=True).start()
 
 def _suggest_cache_clear():
     with _suggest_cache_lock:
         _suggest_cache.clear()
+    _suggest_cache_persist()
     with _suggest_pool_lock:
         _suggest_pool.clear()
         _suggest_zim_locks.clear()
     with _fts_pool_lock:
         _fts_pool.clear()
         _fts_zim_locks.clear()
+
+_SUGGEST_CACHE_PATH = os.path.join(ZIMI_DATA_DIR, "suggest_cache.json")
+
+def _suggest_cache_persist():
+    """Save suggest cache to disk so it survives restarts."""
+    try:
+        with _suggest_cache_lock:
+            data = {}
+            for (q, zim), entry in _suggest_cache.items():
+                data[f"{q}\t{zim}"] = entry
+        if not data:
+            # Nothing to save — remove stale file if it exists
+            if os.path.exists(_SUGGEST_CACHE_PATH):
+                os.remove(_SUGGEST_CACHE_PATH)
+            return
+        with open(_SUGGEST_CACHE_PATH + ".tmp", "w") as f:
+            json.dump(data, f)
+        os.replace(_SUGGEST_CACHE_PATH + ".tmp", _SUGGEST_CACHE_PATH)
+        log.debug("Suggest cache persisted: %d entries", len(data))
+    except Exception as e:
+        log.debug("Suggest cache persist failed: %s", e)
+
+def _suggest_cache_restore():
+    """Load suggest cache from disk on startup."""
+    try:
+        if not os.path.exists(_SUGGEST_CACHE_PATH):
+            return 0
+        with open(_SUGGEST_CACHE_PATH) as f:
+            data = json.load(f)
+        now = time.time()
+        loaded = 0
+        with _suggest_cache_lock:
+            for key_str, entry in data.items():
+                # Skip expired entries
+                if now - entry.get("ts", 0) > _SUGGEST_CACHE_TTL:
+                    continue
+                parts = key_str.split("\t", 1)
+                if len(parts) == 2:
+                    _suggest_cache[(parts[0], parts[1])] = entry
+                    loaded += 1
+        return loaded
+    except Exception:
+        return 0
 
 # MIME type fallback for ZIM entries with empty mimetype
 MIME_FALLBACK = {
@@ -4195,27 +4246,32 @@ def main():
         threading.Thread(target=_warm_fts_pool, daemon=True).start()
         # Build SQLite title indexes in background (one-time per ZIM, enables <10ms title search)
         threading.Thread(target=_build_all_title_indexes, daemon=True).start()
-        # Pre-warm title index SQLite connections (opens DB handles + mmap pages)
+        # Pre-warm title index SQLite connections (opens DB handles, no heavy I/O)
         def _warm_title_indexes():
             zim_files = get_zim_files()
             opened = 0
             for name in zim_files:
                 if _get_title_db(name) is not None:
-                    # Run a trivial query to warm the B-tree pages into OS cache
-                    try:
-                        _title_index_search(name, "a", limit=1)
-                    except Exception:
-                        pass
                     opened += 1
-            log.info("Title indexes warmed: %d/%d", opened, len(zim_files))
+            log.info("Title indexes opened: %d/%d", opened, len(zim_files))
         threading.Thread(target=_warm_title_indexes, daemon=True).start()
+        # Restore suggest cache from disk (instant warm queries after restart)
+        loaded = _suggest_cache_restore()
+        if loaded:
+            log.info("Suggest cache restored: %d entries", loaded)
         # Start auto-update thread if enabled
         if _auto_update_enabled:
             _auto_update_thread = threading.Thread(target=_auto_update_loop, daemon=True)
             _auto_update_thread.start()
         print(f"Endpoints: /search, /read, /suggest, /list, /health")
         server = ThreadingHTTPServer(("0.0.0.0", args.port), ZimHandler)
-        server.serve_forever()
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            pass
+        finally:
+            _suggest_cache_persist()
+            log.info("Suggest cache saved to disk")
 
     else:
         parser.print_help()
