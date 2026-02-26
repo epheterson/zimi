@@ -2074,6 +2074,20 @@ def _extract_preview(archive, zim_name, path):
                     result["thumbnail"] = f"/w/{zim_name}/{resolved}"
                     break
 
+    # -- World Factbook: try locator map if no flag found --
+    if "theworldfactbook" in zim_name.lower() and not result["thumbnail"]:
+        for loc_m in re.finditer(r'<img\b([^>]*)>', html_str[:60000], re.IGNORECASE):
+            attrs = loc_m.group(1)
+            src_m = re.search(r'src=["\']([^"\']+)["\']', attrs, re.IGNORECASE)
+            if not src_m:
+                continue
+            src = src_m.group(1)
+            if "locator-map" in src.lower() and not src.startswith(("http", "//", "data:")):
+                resolved = _resolve_img_path(archive, path, src)
+                if resolved:
+                    result["thumbnail"] = f"/w/{zim_name}/{resolved}"
+                    break
+
     # -- xkcd: use comic alt-text (title attr) as blurb --
     if "xkcd" in zim_name.lower() and not result["blurb"]:
         for img_m in re.finditer(r'<img\b([^>]*)>', html_str, re.IGNORECASE):
@@ -2140,8 +2154,8 @@ def _extract_preview(archive, zim_name, path):
             if is_simple:
                 # Simple Wiktionary: treat entire page as English content
                 eng_section = html_str[:30000]
-                # Part of speech: look for bold/italic patterns like "<b>word</b> (<i>noun</i>)"
-                for pos_m in re.finditer(r'<h[34][^>]*>(.*?)</h', eng_section, re.DOTALL | re.IGNORECASE):
+                # Part of speech: Simple Wiktionary uses <h2> for POS (not nested under language)
+                for pos_m in re.finditer(r'<h[234][^>]*>(.*?)</h', eng_section, re.DOTALL | re.IGNORECASE):
                     pos_text = strip_html(pos_m.group(1)).strip()
                     if pos_text.lower() in ('noun', 'verb', 'adjective', 'adverb', 'pronoun', 'preposition',
                                              'conjunction', 'interjection', 'determiner', 'particle', 'prefix', 'suffix'):
@@ -2224,6 +2238,11 @@ def _extract_preview(archive, zim_name, path):
         if src.startswith("data:") or src.startswith("http") or src.startswith("//"):
             continue
         if src.lower().endswith(".svg") or src.lower().endswith(".svg.png"):
+            continue
+        # Skip generic site chrome images (navigation icons, banners)
+        src_base = src.rsplit("/", 1)[-1].lower()
+        if src_base in ("home_on.png", "home_off.png", "banner_ext2.png",
+                         "photo_on.gif", "one-page-summary.png", "travel-facts.png"):
             continue
         w_m = re.search(r'width=["\']?(\d+)', attrs)
         h_m = re.search(r'height=["\']?(\d+)', attrs)
@@ -2946,6 +2965,7 @@ def _get_downloads():
 
 class ZimHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
+    timeout = 30  # seconds — prevents slow-client DoS on POST bodies
 
     def do_HEAD(self):
         """Handle HEAD requests (Traefik health checks)."""
@@ -3213,7 +3233,7 @@ class ZimHandler(BaseHTTPRequestHandler):
                 want_thumb = param("thumb") == "1"
                 require_thumb = param("require_thumb") == "1"
                 is_wiktionary = "wiktionary" in pick_name.lower()
-                max_tries = 20 if is_wiktionary else (5 if require_thumb else 1)
+                max_tries = 50 if is_wiktionary else (5 if require_thumb else 1)
                 t0 = time.time()
                 with _zim_lock:
                     archive = get_archive(pick_name)
@@ -3459,6 +3479,11 @@ class ZimHandler(BaseHTTPRequestHandler):
                     return self._json(401, {"error": "unauthorized", "needs_password": True})
 
             if parsed.path == "/resolve":
+                retry_after = _check_rate_limit(self._client_ip())
+                if retry_after > 0:
+                    with _metrics_lock:
+                        _metrics["rate_limited"] += 1
+                    return self._json(429, {"error": "rate limited", "retry_after": retry_after})
                 # Batch cross-ZIM URL resolution: POST {"urls": [...]} → {"results": {...}}
                 urls = data.get("urls", [])
                 if not isinstance(urls, list) or len(urls) > 100:

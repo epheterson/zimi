@@ -972,7 +972,7 @@
     <div id="suggest-dropdown" class="suggest-dropdown"></div>
   </div>
   <a href="#" id="random-btn" class="random-btn" title="Random article (R)" onclick="randomArticle(event)"><span class="dice">&#x1F3B2;</span></a>
-  <button id="library-btn" class="library-btn" title="Library (H)" onclick="toggleLibraryPanel()"></button>
+  <button id="library-btn" class="library-btn" title="Library (H)" onclick="if(readerOpen){toggleBookmark();_updateLibraryBtnIcon()}else{toggleLibraryPanel()}"></button>
   <a href="#" id="manage-btn" class="manage-btn" title="Library Manager" onclick="toggleManage(event)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></a>
   <a id="newtab-btn" class="newtab-btn" href="#" target="_blank" rel="noopener" title="Open in browser" onclick="event.preventDefault();_openInBrowser()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>
 
@@ -1942,6 +1942,8 @@ function _loadDiscover() {
       if (n === feat.match || n.indexOf(feat.match) === 0) {
         // For wikipedia, prefer _en_all or exact match (skip _en_medicine etc.)
         if (feat.match === 'wikipedia' && n !== 'wikipedia' && !/^wikipedia_en_all/i.test(n)) continue;
+        // For wiktionary, prefer simple (English-only — no language filtering needed)
+        if (feat.match === 'wiktionary' && /simple/i.test(n)) { zimName = n; zimEntries = Infinity; continue; }
         // Prefer ZIM with most entries (richest content)
         var zInfo = zimsCache && zimsCache.find(function(z) { return z.name === n; });
         var ec = (zInfo && typeof zInfo.entries === 'number') ? zInfo.entries : 0;
@@ -2092,9 +2094,10 @@ function _renderDiscover(el, items) {
     } else {
       sourceLabel = _zimTitle(it.zim);
     }
-    // Thumbnail
+    // Thumbnail — filter out generic site chrome images
     var thumbHtml;
-    if (it.thumbnail) {
+    var hasGoodThumb = it.thumbnail && !/home_on\.png|banner_ext|photo_on\.gif/i.test(it.thumbnail);
+    if (hasGoodThumb) {
       thumbHtml = '<img class="dc-thumb" src="' + escAttr(it.thumbnail) + '" loading="lazy" onerror="this.style.display=\'none\'" onload="if(this.naturalWidth<80||this.naturalHeight<60)this.style.display=\'none\'">';
     } else if (it.label === 'Country of the Day') {
       thumbHtml = '<div class="dc-icon-thumb" style="background:linear-gradient(135deg,#0a1628,#162040)"><span style="font-size:40px;line-height:1">&#x1F30D;</span></div>';
@@ -2113,12 +2116,14 @@ function _renderDiscover(el, items) {
       if (!displayTitle) displayTitle = it.title || 'Historical event';
     }
     var isQuote = it.blurb && (it.blurb.charAt(0) === '\u201c' || it.blurb.charAt(0) === '"');
+    // Named Quote of the Day slot always uses quote card template
+    if (!isQuote && it.label === 'Quote of the Day' && (it.blurb || it.title)) isQuote = true;
     var blurbHtml = it.blurb ? '<div class="dc-blurb' + (isQuote ? ' dc-quote' : '') + '">' + esc(it.blurb) + '</div>' : '';
     // Quote cards: header + decorative quote mark + serif quote + attribution
     if (isQuote) {
       var attrName = it.attribution || it.speaker || displayTitle;
-      var cleanQuote = it.blurb ? it.blurb.replace(/^[\u201c\u201d"]+\s*/, '') : '';
-      var attrLine = attrName
+      var cleanQuote = it.blurb ? it.blurb.replace(/^[\u201c\u201d"]+\s*/, '').replace(/[\u201d"]+\s*$/, '') : displayTitle;
+      var attrLine = (attrName && attrName !== cleanQuote)
         ? '<div class="dc-attribution">\u2014 ' + esc(attrName) + '</div>'
         : '';
       h += '<div class="discover-card dc-quote-card" onclick="openArticle(\'' + escJs(it.zim) + '\',\'' + escJs(it.path) + '\',\'' + escJs(it.title || '') + '\')">' +
@@ -2422,10 +2427,11 @@ q.addEventListener('mousedown', function() { _searchFocusedByUser = true; });
 q.addEventListener('touchstart', function() { _searchFocusedByUser = true; });
 q.addEventListener('focus', function() {
   if (_searchFocusedByUser && !q.value.trim() && mode !== 'manage') showHistoryDropdown();
-  _searchFocusedByUser = false;
-  if (window.matchMedia('(max-width: 600px)').matches) {
+  // Only hide topbar icons on mobile when user tapped the search box (not autofocus on load)
+  if (_searchFocusedByUser && window.matchMedia('(max-width: 600px)').matches) {
     document.querySelector('.topbar').classList.add('search-focused');
   }
+  _searchFocusedByUser = false;
 });
 q.addEventListener('blur', function() {
   document.querySelector('.topbar').classList.remove('search-focused');
