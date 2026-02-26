@@ -6,8 +6,10 @@ Kiwix packages the world's knowledge into ZIM files — compressed offline copie
 
 **What you get:**
 
-- **Cross-source search** — two-stage search: instant title matches first, then deep full-text results across all ZIMs in parallel. Results ranked by title relevance, source authority, and position — not just keyword hits.
+- **Cross-source search** — two-stage search: instant title matches first, then deep full-text results across all ZIMs in parallel. Results ranked by title relevance, source authority, and position — with thumbnails and smart snippets.
 - **Discover** — daily highlights from your installed sources: Picture of the Day, On This Day, Quote of the Day, Country of the Day, and more. Content rotates daily.
+- **Cross-source links** — reading Wikipedia and it links to Wiktionary? Or Stack Overflow to a GitHub repo? If you have both installed, the link lights up — click and stay in Zimi.
+- **Bookmarks & history** — save articles while reading, search your history, pick up where you left off.
 - **Catalog browser** — visual gallery of 1,000+ Kiwix archives across 10+ categories. One-click install with flavor picker (Mini / No images / Full).
 - **Article reader** — clean dark-theme reader with navigation history, PDF viewer, and cross-ZIM link resolution.
 - **Library management** — auto-update on a schedule, password protection, download queue with progress tracking.
@@ -74,6 +76,8 @@ zimi serve --port 8899
 | `GET /collections` | List all collections |
 | `POST /collections` | Create/update a collection |
 | `DELETE /collections?name=...` | Delete a collection |
+| `GET /resolve?url=...` | Resolve external URL to ZIM source + path |
+| `POST /resolve` | Batch resolve: `{"urls": [...]}` → `{"results": {...}}` |
 | `GET /health` | Health check (includes version) |
 | `GET /w/<zim>/<path>` | Serve raw ZIM content (HTML, images) |
 
@@ -158,7 +162,7 @@ services:
 | **Library management** | Built-in catalog browser, downloads, updates | Separate CLI tool (kiwix-manage) |
 | **AI integration** | MCP server for Claude Code | None |
 | **Desktop app** | Native macOS app | None |
-| **Runtime** | Python (~2,900 lines) | C++ (libkiwix) |
+| **Runtime** | Python (~4,200 lines) | C++ (libkiwix) |
 | **Memory** | Higher (Python + SQLite indexes) | Lower (native C++) |
 
 **Use kiwix-serve** for lightweight, proven ZIM serving on low-memory devices. **Use Zimi** for JSON APIs, cross-source search, library management, AI integration, or a desktop app.
